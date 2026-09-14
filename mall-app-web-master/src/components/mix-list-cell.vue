@@ -9,7 +9,7 @@
     <text v-if="icon" class="cell-icon yticon" :style="[{ color: iconColor }]" :class="icon"></text>
     <text class="cell-tit clamp">{{ title }}</text>
     <text v-if="tips" class="cell-tip">{{ tips }}</text>
-    <text class="cell-more yticon" :class="typeList[navigateType]"></text>
+    <text class="cell-more yticon" :class="navigateIcon"></text>
   </view>
 </template>
 
@@ -36,6 +36,10 @@ const typeList = {
   up: 'icon-shang',
   down: 'icon-xia',
 }
+
+const navigateIcon = computed(() => {
+  return props.navigateType ? typeList[props.navigateType] : ''
+})
 </script>
 
 <style lang="scss" scoped>

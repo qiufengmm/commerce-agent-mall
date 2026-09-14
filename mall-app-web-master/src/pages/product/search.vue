@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSearchStore } from '@/stores/search'
+import { goBackOrHome } from '@/utils/navigation'
 
 // ===== Store 相关 =====
 // 获取搜索store
@@ -96,7 +97,7 @@ const handleClearInput = () => {
 
 // 取消搜索
 const handleCancel = () => {
-  uni.navigateBack()
+  goBackOrHome()
 }
 
 // 清空搜索历史

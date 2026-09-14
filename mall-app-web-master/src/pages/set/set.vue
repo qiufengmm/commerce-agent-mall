@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { useMemberStore } from '@/stores/member'
+import { goBackOrHome } from '@/utils/navigation'
 // 获取会员store
 const memberStore = useMemberStore()
 
@@ -74,7 +75,7 @@ const toLogout = () => {
           icon: 'success',
         })
         setTimeout(() => {
-          uni.navigateBack()
+          goBackOrHome()
         }, 200)
       }
     },

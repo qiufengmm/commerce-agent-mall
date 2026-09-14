@@ -260,6 +260,7 @@ import type {
 import type { PmsBrand } from '@/types/brand'
 import type { SmsCoupon } from '@/types/coupon'
 import { formatDate } from '@/utils/date'
+import { goBackOrHome } from '@/utils/navigation'
 
 // ===== 导航栏相关 =====
 const statusBarHeight = ref(0)
@@ -624,7 +625,7 @@ const getSkuStock = (): PmsSkuStock | null => {
 
 // 返回上一页
 const handleGoBack = () => {
-  uni.navigateBack({ delta: 1 })
+  goBackOrHome()
 }
 
 // 切换规格弹窗
