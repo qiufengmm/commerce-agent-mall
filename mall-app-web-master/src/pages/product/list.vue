@@ -309,8 +309,9 @@ const handleNavToDetail = (item: PmsProduct) => {
 }
 
 // 跳转到搜索页
+// 用 redirectTo 替换当前结果页，保证连续搜索不会在历史栈中堆积旧结果页
 const handleNavToSearch = () => {
-  uni.navigateTo({
+  uni.redirectTo({
     url: '/pages/product/search',
   })
 }

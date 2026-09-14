@@ -74,7 +74,8 @@ const handleSearch = () => {
     searchStore.addKeyword(trimmed)
   }
   // 跳转到商品列表页（空关键字搜索所有商品）
-  uni.navigateTo({
+  // 用 redirectTo 替换当前搜索页，防止连续搜索在历史栈中层层堆积
+  uni.redirectTo({
     url: trimmed
       ? `/pages/product/list?keyword=${encodeURIComponent(trimmed)}`
       : '/pages/product/list',
@@ -85,7 +86,7 @@ const handleSearch = () => {
 const handleHistoryClick = (item: string) => {
   keyword.value = item
   searchStore.addKeyword(item)
-  uni.navigateTo({
+  uni.redirectTo({
     url: `/pages/product/list?keyword=${encodeURIComponent(item)}`,
   })
 }
