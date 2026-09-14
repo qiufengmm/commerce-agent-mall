@@ -23,3 +23,6 @@ imgmigrate/mirror/
 imgmigrate/config.py
 imgmigrate/output/*backup*.sql
 imgmigrate/output/mall_after_migration.sql
+# Python 缓存
+__pycache__/
+*.py[cod]
