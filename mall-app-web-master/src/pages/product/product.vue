@@ -757,9 +757,25 @@ const handleToggleFavorite = async () => {
 
 // 立即购买
 const handleBuy = () => {
-  uni.showToast({
-    title: '暂时只支持从购物车下单！',
-    icon: 'none',
+  if (!memberStore.hasLogin) {
+    handleCheckLogin()
+    return
+  }
+  const skuStock = getSkuStock()
+  if (!skuStock) {
+    uni.showToast({
+      title: '请选择规格',
+      icon: 'none',
+    })
+    return
+  }
+  const directBuy = {
+    productId: product.value.id,
+    productSkuId: skuStock.id,
+    quantity: 1,
+  }
+  uni.navigateTo({
+    url: `/pages/order/createOrder?directBuy=${encodeURIComponent(JSON.stringify(directBuy))}`,
   })
 }
 

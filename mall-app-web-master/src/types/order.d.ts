@@ -132,11 +132,20 @@ export type OrderParam = {
   /** 优惠券ID */
   couponId?: number
   /** 被选中的购物车商品ID列表 */
-  cartIds: number[]
+  cartIds?: number[]
+  /** 商品详情页直接购买参数 */
+  directBuy?: DirectBuyParam
   /** 收货地址ID */
   memberReceiveAddressId?: number
   /** 使用的积分数 */
   useIntegration: number
+}
+
+/** 商品详情页直接购买参数 */
+export type DirectBuyParam = {
+  productId: number
+  productSkuId: number
+  quantity: number
 }
 
 /** 生成订单返回结果（对应后端 OrderResult） */

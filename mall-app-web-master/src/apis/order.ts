@@ -1,6 +1,7 @@
 import { http } from '@/utils/http'
 import type {
   ConfirmOrderResult,
+  DirectBuyParam,
   GenerateOrderResult,
   OrderParam,
   OmsOrderDetail,
@@ -14,6 +15,15 @@ export const generateConfirmOrderAPI = (cartIds: number[]) => {
     method: 'POST',
     url: '/order/generateConfirmOrder',
     data: cartIds,
+  })
+}
+
+/** 根据商品详情页选中的 SKU 生成直购确认单 */
+export const generateDirectConfirmOrderAPI = (data: DirectBuyParam) => {
+  return http<ConfirmOrderResult>({
+    method: 'POST',
+    url: '/order/generateDirectConfirmOrder',
+    data,
   })
 }
 

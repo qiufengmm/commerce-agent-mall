@@ -146,9 +146,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { generateConfirmOrderAPI, generateOrderAPI } from '@/apis/order'
+import { generateConfirmOrderAPI, generateDirectConfirmOrderAPI, generateOrderAPI } from '@/apis/order'
 import { formatDate } from '@/utils/date'
-import type { CartPromotionItem, CalcAmount, UmsIntegrationConsumeSetting } from '@/types/order'
+import type {
+  CartPromotionItem,
+  CalcAmount,
+  DirectBuyParam,
+  UmsIntegrationConsumeSetting,
+} from '@/types/order'
 import type { SmsCoupon } from '@/types/coupon'
 import type { MemberReceiveAddress } from '@/types/address'
 
@@ -179,12 +184,16 @@ const integrationConsumeSetting = ref<UmsIntegrationConsumeSetting>(
 const memberIntegration = ref(0)
 // 购物车ID列表
 const cartIds = ref<number[]>([])
+// 商品详情页直购参数；存在时不读取或修改购物车
+const directBuy = ref<DirectBuyParam>()
 
 // ===== 加载数据 =====
 // 生成确认单信息
 const loadData = async () => {
   try {
-    const res = await generateConfirmOrderAPI(cartIds.value)
+    const res = directBuy.value
+      ? await generateDirectConfirmOrderAPI(directBuy.value)
+      : await generateConfirmOrderAPI(cartIds.value)
     const data = res.data
     memberReceiveAddressList.value = data.memberReceiveAddressList || []
     currentAddress.value = getDefaultAddress()
@@ -233,6 +242,10 @@ onLoad((option) => {
     cartIds.value = JSON.parse(option.cartIds)
     loadData()
   }
+  if (option?.directBuy) {
+    directBuy.value = JSON.parse(decodeURIComponent(option.directBuy))
+    loadData()
+  }
 })
 
 // ===== 事件处理方法 =====
@@ -255,6 +268,7 @@ const handleSubmit = async () => {
     payType: 0,
     couponId: undefined as number | undefined,
     cartIds: cartIds.value.map(Number),
+    directBuy: directBuy.value,
     memberReceiveAddressId: currentAddress.value?.id as number | undefined,
     useIntegration: useIntegration.value,
   }

@@ -99,6 +99,7 @@ import type { PageParam } from '@/types/common'
 const navList = [
   { state: -1, text: '全部' },
   { state: 0, text: '待付款' },
+  { state: 1, text: '待发货' },
   { state: 2, text: '待收货' },
   { state: 3, text: '已完成' },
   { state: 4, text: '已取消' },

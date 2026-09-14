@@ -22,4 +22,13 @@ public class OrderParam {
     private Integer payType;
     @Schema(title = "被选中的购物车商品ID")
     private List<Long> cartIds;
+    @Schema(title = "商品详情页直接购买参数")
+    private DirectBuyParam directBuy;
+
+    /**
+     * 直购订单不依赖购物车记录。
+     */
+    public boolean isDirectBuy() {
+        return directBuy != null;
+    }
 }

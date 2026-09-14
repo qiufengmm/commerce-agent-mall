@@ -35,6 +35,8 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
     @Autowired
     private OmsCartItemService cartItemService;
     @Autowired
+    private OmsPromotionService promotionService;
+    @Autowired
     private UmsMemberReceiveAddressService memberReceiveAddressService;
     @Autowired
     private UmsMemberCouponService memberCouponService;
@@ -67,10 +69,20 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
 
     @Override
     public ConfirmOrderResult generateConfirmOrder(List<Long> cartIds) {
-        ConfirmOrderResult result = new ConfirmOrderResult();
-        //获取购物车信息
         UmsMember currentMember = memberService.getCurrentMember();
         List<CartPromotionItem> cartPromotionItemList = cartItemService.listPromotion(currentMember.getId(),cartIds);
+        return buildConfirmOrderResult(currentMember, cartPromotionItemList);
+    }
+
+    @Override
+    public ConfirmOrderResult generateDirectConfirmOrder(DirectBuyParam directBuyParam) {
+        UmsMember currentMember = memberService.getCurrentMember();
+        List<CartPromotionItem> cartPromotionItemList = getDirectCartPromotionItemList(directBuyParam);
+        return buildConfirmOrderResult(currentMember, cartPromotionItemList);
+    }
+
+    private ConfirmOrderResult buildConfirmOrderResult(UmsMember currentMember, List<CartPromotionItem> cartPromotionItemList) {
+        ConfirmOrderResult result = new ConfirmOrderResult();
         result.setCartPromotionItemList(cartPromotionItemList);
         //获取用户收货地址列表
         List<UmsMemberReceiveAddress> memberReceiveAddressList = memberReceiveAddressService.list();
@@ -96,9 +108,8 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         if(orderParam.getMemberReceiveAddressId()==null){
             Asserts.fail("请选择收货地址！");
         }
-        //获取购物车及优惠信息
         UmsMember currentMember = memberService.getCurrentMember();
-        List<CartPromotionItem> cartPromotionItemList = cartItemService.listPromotion(currentMember.getId(), orderParam.getCartIds());
+        List<CartPromotionItem> cartPromotionItemList = getOrderPromotionItemList(currentMember, orderParam);
         for (CartPromotionItem cartPromotionItem : cartPromotionItemList) {
             //生成下单商品信息
             OmsOrderItem orderItem = new OmsOrderItem();
@@ -238,14 +249,57 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
             }
             memberService.updateIntegration(currentMember.getId(), currentMember.getIntegration() - orderParam.getUseIntegration());
         }
-        //删除购物车中的下单商品
-        deleteCartItemList(cartPromotionItemList, currentMember);
+        //直购商品未写入购物车，只有购物车下单才删除对应记录
+        if (!orderParam.isDirectBuy()) {
+            deleteCartItemList(cartPromotionItemList, currentMember);
+        }
         //发送延迟消息取消订单
         sendDelayMessageCancelOrder(order.getId());
         Map<String, Object> result = new HashMap<>();
         result.put("order", order);
         result.put("orderItemList", orderItemList);
         return result;
+    }
+
+    private List<CartPromotionItem> getOrderPromotionItemList(UmsMember currentMember, OrderParam orderParam) {
+        if (orderParam.isDirectBuy()) {
+            return getDirectCartPromotionItemList(orderParam.getDirectBuy());
+        }
+        return cartItemService.listPromotion(currentMember.getId(), orderParam.getCartIds());
+    }
+
+    private List<CartPromotionItem> getDirectCartPromotionItemList(DirectBuyParam directBuyParam) {
+        if (directBuyParam == null || directBuyParam.getProductId() == null || directBuyParam.getProductSkuId() == null) {
+            Asserts.fail("请选择商品规格");
+        }
+        if (directBuyParam.getQuantity() == null || directBuyParam.getQuantity() <= 0) {
+            Asserts.fail("购买数量必须大于0");
+        }
+        CartProduct product = cartItemService.getCartProduct(directBuyParam.getProductId());
+        if (product == null || CollectionUtils.isEmpty(product.getSkuStockList())) {
+            Asserts.fail("商品不存在或已下架");
+        }
+        PmsSkuStock skuStock = product.getSkuStockList().stream()
+                .filter(item -> directBuyParam.getProductSkuId().equals(item.getId()))
+                .findFirst()
+                .orElse(null);
+        if (skuStock == null) {
+            Asserts.fail("商品规格不存在");
+        }
+        OmsCartItem directBuyItem = new OmsCartItem();
+        directBuyItem.setProductId(product.getId());
+        directBuyItem.setProductSkuId(skuStock.getId());
+        directBuyItem.setProductSkuCode(skuStock.getSkuCode());
+        directBuyItem.setProductName(product.getName());
+        directBuyItem.setProductPic(skuStock.getPic() == null ? product.getPic() : skuStock.getPic());
+        directBuyItem.setProductAttr(skuStock.getSpData());
+        directBuyItem.setProductBrand(product.getBrandName());
+        directBuyItem.setProductCategoryId(product.getProductCategoryId());
+        directBuyItem.setProductSn(product.getProductSn());
+        directBuyItem.setProductSubTitle(product.getSubTitle());
+        directBuyItem.setPrice(skuStock.getPrice());
+        directBuyItem.setQuantity(directBuyParam.getQuantity());
+        return promotionService.calcCartPromotion(Collections.singletonList(directBuyItem));
     }
 
     @Override

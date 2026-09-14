@@ -2,6 +2,7 @@ package com.macro.mall.portal.service;
 
 import com.macro.mall.common.api.CommonPage;
 import com.macro.mall.portal.domain.ConfirmOrderResult;
+import com.macro.mall.portal.domain.DirectBuyParam;
 import com.macro.mall.portal.domain.OmsOrderDetail;
 import com.macro.mall.portal.domain.OrderParam;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,11 @@ public interface OmsPortalOrderService {
      * 根据用户购物车信息生成确认单信息
      */
     ConfirmOrderResult generateConfirmOrder(List<Long> cartIds);
+
+    /**
+     * 根据商品详情页选中的SKU生成直购确认单。
+     */
+    ConfirmOrderResult generateDirectConfirmOrder(DirectBuyParam directBuyParam);
 
     /**
      * 根据提交信息生成订单
