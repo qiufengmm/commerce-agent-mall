@@ -1,0 +1,25 @@
+# 构建产物与依赖
+**/node_modules/
+**/dist/
+**/target/
+**/.vite/
+*.log
+
+# IDE 配置
+**/.idea/
+**/.vscode/
+
+# 本地环境与敏感配置
+**/.env
+**/.env.*
+!**/.env.example
+**/application-dev.yml
+**/application-prod.yml
+**/application-dev.yaml
+**/application-prod.yaml
+
+# 图片迁移的本地数据与数据库备份
+imgmigrate/mirror/
+imgmigrate/config.py
+imgmigrate/output/*backup*.sql
+imgmigrate/output/mall_after_migration.sql

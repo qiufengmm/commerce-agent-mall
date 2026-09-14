@@ -1,0 +1,3 @@
+HTTP 404	http://macro-oss.oss-cn-shenzhen.aliyuncs.com/mall/images/20180615/5ac98b64N70acd82f.jpg
+HTTP 404	http://macro-oss.oss-cn-shenzhen.aliyuncs.com/mall/images/20180615/5ad83a4fN6ff67ecd.jpg
+HTTP 404	https://macro-oss.oss-cn-shenzhen.aliyuncs.com/mall/icon/github_icon_01.png
