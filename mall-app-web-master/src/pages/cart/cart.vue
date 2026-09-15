@@ -101,6 +101,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
 import { getCartListAPI, deleteCartAPI, updateCartQuantityAPI } from '@/apis/cart'
 import type { CartItem } from '@/types/cart'
+import { removeCartItemsById } from '@/utils/cart'
 import uniNumberBox from '@/components/uni-number-box.vue'
 
 // ===== Store 相关 =====
@@ -321,8 +322,7 @@ const handleClearSelected = () => {
       if (e.confirm) {
         try {
           await deleteCartAPI({ ids })
-          const idArr = ids.split(',')
-          cartList.value = cartList.value.filter((item) => !idArr.includes(item.id))
+          cartList.value = removeCartItemsById(cartList.value, ids)
           offsets.value = {}
           openIndex.value = -1
           calcTotal()
