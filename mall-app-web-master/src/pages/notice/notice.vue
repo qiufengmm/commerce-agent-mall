@@ -7,7 +7,7 @@
         <view class="img-wrapper">
           <image
             class="pic"
-            src="https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1556465765776&di=57bb5ff70dc4f67dcdb856e5d123c9e7&imgtype=0&src=http%3A%2F%2Fimg.zcool.cn%2Fcommunity%2F01fd015aa4d95fa801206d96069229.jpg%401280w_1l_2o_100sh.jpg"
+            src="/static/notice/ad1.jpg"
           ></image>
         </view>
         <text class="introduce">
@@ -26,7 +26,7 @@
         <view class="img-wrapper">
           <image
             class="pic"
-            src="https://ss1.bdstatic.com/70cFvXSh_Q1YnxGkpoWK1HF6hhy/it/u=3761064275,227090144&fm=26&gp=0.jpg"
+            src="/static/notice/ad2.jpg"
           ></image>
           <view class="cover">活动结束</view>
         </view>
@@ -43,7 +43,7 @@
         <view class="img-wrapper">
           <image
             class="pic"
-            src="https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1556465765776&di=57bb5ff70dc4f67dcdb856e5d123c9e7&imgtype=0&src=http%3A%2F%2Fimg.zcool.cn%2Fcommunity%2F01fd015aa4d95fa801206d96069229.jpg%401280w_1l_2o_100sh.jpg"
+            src="/static/notice/movie-ad.jpg"
           ></image>
           <view class="cover">活动结束</view>
         </view>
@@ -59,7 +59,17 @@
   </view>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { onShow } from '@dcloudio/uni-app'
+
+// 进入消息页即标记已读，隐藏导航栏消息按钮红点
+onShow(() => {
+  uni.setStorageSync('noticeRead', true)
+  // #ifdef H5
+  document.body.classList.add('notice-read')
+  // #endif
+})
+</script>
 
 <style lang="scss">
 page {

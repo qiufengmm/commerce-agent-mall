@@ -6,6 +6,12 @@ onLaunch(() => {
 })
 onShow(() => {
   console.log('App Show')
+  // #ifdef H5
+  // 消息已读过则恢复隐藏导航栏消息按钮红点（刷新后 body 类会丢失，从本地存储恢复）
+  if (uni.getStorageSync('noticeRead')) {
+    document.body.classList.add('notice-read')
+  }
+  // #endif
 })
 onHide(() => {
   console.log('App Hide')
@@ -78,4 +84,12 @@ image {
 .b-t:after {
   top: 0;
 }
+
+/* #ifdef H5 */
+// 消息已读后隐藏 H5 导航栏消息按钮红点
+// 注意：uni-page-head-btn-red-dot 类挂在整个按钮上，红点是其 :after 伪元素，只隐藏伪元素
+body.notice-read .uni-page-head-btn-red-dot:after {
+  display: none !important;
+}
+/* #endif */
 </style>
