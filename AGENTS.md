@@ -5,11 +5,11 @@
 用户提出开发、排错或分析任务后，主 Agent 自动按复杂度分工：
 
 - 定位代码、接口、数据表或业务链路：优先调用 `pr_explorer`，只读分析。
-- 所有实际代码实现：由主 Agent 完成设计与任务拆分后，默认委派给 WorkBuddy；`worker` 已停用，不承担实现任务。
+- 所有实际代码实现：由主 Agent 完成设计与任务拆分后，**必须由 CodeBuddy 实现**；`worker` 已停用，不承担实现任务。主 Agent 通过 WorkBuddy MCP 调度 CodeBuddy，但 WorkBuddy 仅是调度层，不是编码 Agent。
 - 跨前后端、订单、库存、支付、权限等核心问题：先调用 `pr_explorer` 分析；主 Agent 统一制定方案。涉及核心规则、数据库结构或大范围重构时，必须先获得用户确认。
-- WorkBuddy 完成后：主 Agent 先核对实际 Git diff，再调用 `reviewer` 审查；主 Agent 汇总风险并运行相关验证。
+- CodeBuddy 任务完成后：主 Agent 先核对实际 Git diff，再调用 `reviewer` 审查；主 Agent 汇总风险并运行相关验证。
 - 简单任务不额外启动子 Agent；用户也可以明确要求不用某个 Agent，或指定由哪个 Agent 处理。
-- 子 Agent 因模型容量不足、权限审批或等待状态无法继续时，主 Agent 必须立即停止该 Agent，保留已写入的工作区改动，并自行接手或向用户说明阻塞原因；不得让任务无限等待。
+- CodeBuddy 因模型容量不足、权限审批、超时或等待状态无法继续时，主 Agent 必须立即停止该任务，保留已写入的工作区改动并向用户说明阻塞原因；除非用户明确授权，否则不得自行接手编写代码，也不得让任务无限等待。
 
 ### 标准实现闭环
 
@@ -17,8 +17,8 @@
 
 1. 解释业务流程、影响文件、方案与验收标准；涉及核心规则、数据库结构或大范围重构时先获得用户确认；
 2. 记录目标仓库的 `git status`，确认已有改动与本次任务边界；
-3. 调用 WorkBuddy 实现，提示词必须包含已确认的设计、文件范围、禁止扩大范围与验证要求；
-4. 读取 WorkBuddy 返回的修改文件、位置、`session` 和 `[workbuddy meta]`，但一律视为草稿；
+3. 通过 WorkBuddy MCP 调用 CodeBuddy 实现，提示词必须包含已确认的设计、文件范围、禁止扩大范围与验证要求；
+4. 读取通过 WorkBuddy MCP 返回的 CodeBuddy 修改文件、位置、`session` 和 `[workbuddy meta]`，但一律视为草稿；
 5. 主 Agent 用 `git diff` 核对实际改动，再交由 `reviewer` 只读审查；
 6. 若审查存在 P0/P1 或未满足验收标准，优先携带原 `resumeSessionId` 让同一 WorkBuddy 会话返工；
 7. 审查通过后，运行与改动相关的测试、构建或接口验证；验证通过后，复核 `git status` 与暂存区，确认只包含本次任务文件；
@@ -27,9 +27,9 @@
 
 WorkBuddy 的返回不能替代 Git diff、代码审查或实际验证。出现任务外文件、敏感文件或验证失败时，停止提交并先向用户说明。
 
-## 委派给 WorkBuddy（`run_workbuddy_task`）
+## 通过 WorkBuddy MCP 委派 CodeBuddy（`run_workbuddy_task`）
 
-WorkBuddy 是通过 MCP 接入的外部 CodeBuddy CLI，承担默认代码实现职责；其产出**一律视为未经验证的草稿**。
+WorkBuddy 是通过 MCP 接入的本地调度服务，用于启动外部 CodeBuddy CLI；**CodeBuddy 承担实际代码实现职责**，WorkBuddy 提供权限、会话、模型回退、串行锁、用量与 Git 安全网能力。其产出**一律视为未经验证的草稿**。
 
 - 适合委派：已完成设计的代码实现、跨子项目（`mall-master` / `mall-admin-web-master` / `mall-app-web-master`）的大范围分析或重构、需要长时间探索代码库的调研、批量样板代码生成。
 - 调用时必须显式传 `cwd` 为任务所在的子项目绝对路径（如 `F:\code\mall\mall-app-web-master`）；不传则用根目录 `F:\code\mall`。**传错目录会改错项目**。
