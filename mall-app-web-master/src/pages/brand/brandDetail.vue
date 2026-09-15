@@ -13,7 +13,6 @@
       </view>
       <view class="title">
         <text>{{ brand.name }}</text>
-        <text>品牌首字母：{{ brand.firstLetter }}</text>
       </view>
       <view>
         <text
