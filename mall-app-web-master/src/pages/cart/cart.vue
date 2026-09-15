@@ -1,5 +1,18 @@
 <template>
   <view class="container">
+    <!-- 自定义导航栏 -->
+    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
+      <view class="nav-content">
+        <text class="nav-title">购物车</text>
+        <text
+          class="nav-clear"
+          :class="{ disabled: checkedCount === 0 }"
+          :style="{ right: navClearRight + 'rpx' }"
+          @click="handleClearSelected"
+          >清空选中</text
+        >
+      </view>
+    </view>
     <!-- 空白页 -->
     <view v-if="!hasLogin || empty === true" class="empty">
       <image src="/static/emptyCart.jpg" mode="aspectFit"></image>
@@ -14,59 +27,68 @@
         <view class="navigator" @click="handleNavToLogin">去登陆</view>
       </view>
     </view>
-    <view v-else>
-      <!-- 列表 -->
+    <view v-else class="page-body" :style="{ paddingTop: statusBarHeight + 44 + 'px' }">
+      <!-- 列表（左滑删除） -->
       <view class="cart-list">
-        <block v-for="(item, index) in cartList" :key="item.id">
-          <view class="cart-item" :class="{ 'b-b': index !== cartList.length - 1 }">
-            <view class="image-wrapper" @click="handleNavToProductDetail(item.productId)">
-              <image
-                :src="item.productPic"
-                :class="[item.loaded]"
-                mode="aspectFill"
-                lazy-load
-                @load="handleImageLoad(index)"
-                @error="handleImageError(index)"
-              ></image>
-              <view
-                class="yticon icon-xuanzhong2 checkbox"
-                :class="{ checked: item.checked }"
-                @click.stop="handleCheck(index)"
-              ></view>
+        <view v-for="(item, index) in cartList" :key="item.id" class="swipe-item">
+          <view
+            class="swipe-content"
+            :class="{ 'no-anim': movingIndex === index }"
+            :style="{ transform: `translateX(${offsets[index] || 0}rpx)` }"
+            @touchstart="handleTouchStart($event, index)"
+            @touchmove="handleTouchMove($event, index)"
+            @touchend="handleTouchEnd($event, index)"
+          >
+            <view class="cart-item" :class="{ 'b-b': index !== cartList.length - 1 }">
+              <view class="image-wrapper" @click="handleNavToProductDetail(item.productId)">
+                <image
+                  :src="item.productPic"
+                  :class="[item.loaded]"
+                  mode="aspectFill"
+                  lazy-load
+                  @load="handleImageLoad(index)"
+                  @error="handleImageError(index)"
+                ></image>
+                <view
+                  class="yticon icon-xuanzhong2 checkbox"
+                  :class="{ checked: item.checked }"
+                  @click.stop="handleCheck(index)"
+                ></view>
+              </view>
+              <view class="item-right" @click="handleNavToProductDetail(item.productId)">
+                <text class="clamp title">{{ item.productName }}</text>
+                <text class="clamp attr">{{ item.spDataStr }}</text>
+                <text class="price">¥{{ item.price }}</text>
+                <uni-number-box
+                  class="step"
+                  :min="1"
+                  :max="100"
+                  :value="item.quantity"
+                  :index="index"
+                  @eventChange="handleNumberChange"
+                  @click.stop
+                ></uni-number-box>
+              </view>
             </view>
-            <view class="item-right" @click="handleNavToProductDetail(item.productId)">
-              <text class="clamp title">{{ item.productName }}</text>
-              <text class="clamp attr">{{ item.spDataStr }}</text>
-              <text class="price">¥{{ item.price }}</text>
-              <uni-number-box
-                class="step"
-                :min="1"
-                :max="100"
-                :value="item.quantity"
-                :index="index"
-                @eventChange="handleNumberChange"
-                @click.stop
-              ></uni-number-box>
-            </view>
-            <text class="del-btn yticon icon-fork" @click.stop="handleDeleteCartItem(index)"></text>
           </view>
-        </block>
+          <view class="swipe-del" @click.stop="handleDeleteCartItem(index)">删除</view>
+        </view>
       </view>
       <!-- 底部菜单栏 -->
       <view class="action-section">
-        <view class="checkbox">
+        <view class="checkbox" @click="handleCheckAll">
           <image
             :src="allChecked ? '/static/selected.png' : '/static/select.png'"
             mode="aspectFit"
-            @click="handleCheckAll"
           ></image>
-          <view class="clear-btn" :class="{ show: allChecked }" @click="handleClearCart">清空</view>
+          <text class="all-text">全选</text>
         </view>
         <view class="total-box">
-          <text class="price">¥{{ totalPrice }}元</text>
+          <text class="total-label">合计:</text>
+          <text class="price">¥{{ totalPrice }}</text>
         </view>
         <button type="primary" class="no-border confirm-btn" @click="handleCreateOrder"
-          >去结算</button
+          >去结算({{ checkedCount }})</button
         >
       </view>
     </view>
@@ -77,7 +99,7 @@
 import { ref, computed, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
-import { getCartListAPI, deleteCartAPI, updateCartQuantityAPI, clearCartAPI } from '@/apis/cart'
+import { getCartListAPI, deleteCartAPI, updateCartQuantityAPI } from '@/apis/cart'
 import type { CartItem } from '@/types/cart'
 import uniNumberBox from '@/components/uni-number-box.vue'
 
@@ -96,6 +118,23 @@ const allChecked = ref(false)
 const empty = ref(false)
 // 购物车中商品列表
 const cartList = ref<CartItem[]>([])
+// 状态栏高度（仅小程序需要，H5 为 0）
+const statusBarHeight = ref(0)
+// 右侧清空按钮默认间距；微信小程序会根据右上角胶囊动态调整
+const navClearRight = ref(30)
+// 窗口宽度（touch 像素转 rpx 用）
+const windowWidth = ref(375)
+// 左滑：每条目当前横向偏移（rpx）
+const offsets = ref<Record<number, number>>({})
+// 左滑：当前处于滑开状态的条目索引
+const openIndex = ref(-1)
+// 左滑：正在拖拽中的条目索引（拖拽期间关闭过渡动画）
+const movingIndex = ref(-1)
+const touchState = { startX: 0, startY: 0, horizontal: false }
+
+// 选中商品数量
+const checkedCount = computed(() => cartList.value.filter((item) => item.checked).length)
+
 // ===== 数据加载 =====
 // 加载购物车数据
 const loadData = async () => {
@@ -136,8 +175,72 @@ watch(
 
 // 页面显示时调用
 onShow(() => {
+  // 自定义导航栏需要在小程序与 App 中避开系统状态栏；H5 的高度为 0
+  const systemInfo = uni.getSystemInfoSync()
+  statusBarHeight.value = systemInfo.statusBarHeight || 0
+  windowWidth.value = systemInfo.windowWidth || 375
+  // #ifdef MP-WEIXIN
+  const menuButton = uni.getMenuButtonBoundingClientRect()
+  // 将按钮放在胶囊左侧并留出 8px 间隔，避免文字和点击区域被胶囊遮挡
+  const safeRightPx = systemInfo.windowWidth - menuButton.left + 8
+  navClearRight.value = Math.max(30, Math.ceil((safeRightPx * 750) / windowWidth.value))
+  // #endif
   loadData()
 })
+
+// ===== 左滑删除手势 =====
+// 按下
+const handleTouchStart = (e: TouchEvent, index: number) => {
+  const touch = e.touches[0]
+  touchState.startX = touch.clientX
+  touchState.startY = touch.clientY
+  touchState.horizontal = false
+  // 开始滑动其他条目时，收起已滑开的条目
+  if (openIndex.value !== -1 && openIndex.value !== index) {
+    offsets.value[openIndex.value] = 0
+    openIndex.value = -1
+  }
+}
+
+// 滑动
+const handleTouchMove = (e: TouchEvent, index: number) => {
+  const touch = e.touches[0]
+  const dx = touch.clientX - touchState.startX
+  const dy = touch.clientY - touchState.startY
+  // 先判断滑动意图，垂直滚动时不干预
+  if (!touchState.horizontal) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+      return
+    }
+    touchState.horizontal = Math.abs(dx) > Math.abs(dy)
+    if (!touchState.horizontal) {
+      return
+    }
+    movingIndex.value = index
+  }
+  // 像素转 rpx；已滑开的条目以打开位置为基准
+  const base = openIndex.value === index ? -150 : 0
+  const offsetRpx = (dx * 750) / windowWidth.value + base
+  offsets.value[index] = Math.round(Math.min(0, Math.max(-150, offsetRpx)))
+}
+
+// 松手：超过一半吸附为打开，否则收回
+const handleTouchEnd = (_e: TouchEvent, index: number) => {
+  if (!touchState.horizontal) {
+    return
+  }
+  movingIndex.value = -1
+  const offset = offsets.value[index] || 0
+  if (offset < -75) {
+    offsets.value[index] = -150
+    openIndex.value = index
+  } else {
+    offsets.value[index] = 0
+    if (openIndex.value === index) {
+      openIndex.value = -1
+    }
+  }
+}
 
 // ===== 事件处理方法 =====
 // 图片加载完成
@@ -185,40 +288,56 @@ const handleNumberChange = async (data: { number: number; index: number }) => {
   }
 }
 
-// 删除商品
+// 删除商品（左滑露出的删除按钮）
 const handleDeleteCartItem = async (index: number) => {
   const row = cartList.value[index]
   try {
     await deleteCartAPI({ ids: row.id })
     cartList.value.splice(index, 1)
+    offsets.value = {}
+    openIndex.value = -1
     calcTotal()
-    uni.hideLoading()
   } catch (e) {
     console.error('删除失败', e)
   }
+}
+
+// 清空选中的商品（导航栏右上角按钮）
+const handleClearSelected = () => {
+  if (checkedCount.value === 0) {
+    uni.showToast({
+      title: '请先选择要删除的商品',
+      duration: 1000,
+    })
+    return
+  }
+  const ids = cartList.value
+    .filter((item) => item.checked)
+    .map((item) => item.id)
+    .join(',')
+  uni.showModal({
+    content: `删除已选中的 ${checkedCount.value} 件商品？`,
+    success: async (e) => {
+      if (e.confirm) {
+        try {
+          await deleteCartAPI({ ids })
+          const idArr = ids.split(',')
+          cartList.value = cartList.value.filter((item) => !idArr.includes(item.id))
+          offsets.value = {}
+          openIndex.value = -1
+          calcTotal()
+        } catch (err) {
+          console.error('删除失败', err)
+        }
+      }
+    },
+  })
 }
 
 // 跳转到商品详情
 const handleNavToProductDetail = (productId: number) => {
   uni.navigateTo({
     url: `/pages/product/product?id=${productId}`,
-  })
-}
-
-// 清空购物车
-const handleClearCart = () => {
-  uni.showModal({
-    content: '清空购物车？',
-    success: async (e) => {
-      if (e.confirm) {
-        try {
-          await clearCartAPI()
-          cartList.value = []
-        } catch (err) {
-          console.error('清空失败', err)
-        }
-      }
-    },
   })
 }
 
@@ -304,6 +423,71 @@ const calcTotal = () => {
   }
 }
 
+// 自定义导航栏
+.nav-bar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  z-index: 99;
+  background: #fff;
+
+  .nav-content {
+    position: relative;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .nav-title {
+      font-size: 32rpx;
+      font-weight: bold;
+      color: #303133;
+    }
+
+    .nav-clear {
+      position: absolute;
+      font-size: 28rpx;
+      color: #fa436a;
+
+      &.disabled {
+        color: #c0c4cc;
+      }
+    }
+  }
+}
+
+// 左滑删除
+.swipe-item {
+  position: relative;
+  overflow: hidden;
+
+  .swipe-content {
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    transition: transform 0.25s ease;
+
+    &.no-anim {
+      transition: none;
+    }
+  }
+
+  .swipe-del {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 150rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30rpx;
+    color: #fff;
+    background: #fa436a;
+  }
+}
+
 .cart-item {
   display: flex;
   position: relative;
@@ -363,13 +547,6 @@ const calcTotal = () => {
       line-height: 50rpx;
     }
   }
-
-  .del-btn {
-    padding: 4rpx 10rpx;
-    font-size: 34rpx;
-    height: 50rpx;
-    color: #909399;
-  }
 }
 
 .action-section {
@@ -390,6 +567,8 @@ const calcTotal = () => {
   border-radius: 16rpx;
 
   .checkbox {
+    display: flex;
+    align-items: center;
     height: 52rpx;
     position: relative;
 
@@ -399,40 +578,30 @@ const calcTotal = () => {
       position: relative;
       z-index: 5;
     }
-  }
 
-  .clear-btn {
-    position: absolute;
-    left: 26rpx;
-    top: 0;
-    z-index: 4;
-    width: 0;
-    height: 52rpx;
-    line-height: 52rpx;
-    padding-left: 38rpx;
-    font-size: 28rpx;
-    color: #fff;
-    background: #c0c4cc;
-    border-radius: 0 50px 50px 0;
-    opacity: 0;
-    transition: 0.2s;
-
-    &.show {
-      opacity: 1;
-      width: 120rpx;
+    .all-text {
+      margin-left: 12rpx;
+      font-size: 28rpx;
+      color: #303133;
     }
   }
 
   .total-box {
     flex: 1;
     display: flex;
-    flex-direction: column;
-    text-align: right;
+    justify-content: flex-end;
+    align-items: center;
     padding-right: 40rpx;
+
+    .total-label {
+      font-size: 28rpx;
+      color: #303133;
+    }
 
     .price {
       font-size: 32rpx;
       color: #303133;
+      margin-left: 8rpx;
     }
   }
 
