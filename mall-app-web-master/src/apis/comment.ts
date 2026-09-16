@@ -1,5 +1,5 @@
 import { http } from '@/utils/http'
-import type { PmsComment, PmsCommentParam } from '@/types/comment'
+import type { PmsComment, PmsCommentParam, PmsCommentResult } from '@/types/comment'
 import type { CommonPage, PageParam } from '@/types/common'
 
 /** 提交商品评价 */
@@ -16,6 +16,15 @@ export const getCommentListAPI = (params: PageParam & { productId: number }) => 
   return http<CommonPage<PmsComment>>({
     method: 'GET',
     url: '/comment/list',
+    params,
+  })
+}
+
+/** 分页查询当前登录会员自己的评价 */
+export const getMyCommentListAPI = (params: PageParam) => {
+  return http<CommonPage<PmsCommentResult>>({
+    method: 'GET',
+    url: '/comment/mine',
     params,
   })
 }

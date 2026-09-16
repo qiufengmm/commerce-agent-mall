@@ -97,8 +97,14 @@
     <!-- 评价 -->
     <view class="eva-section">
       <view class="eva-header">
-        <text class="eva-tit">商品评价</text>
-        <text class="eva-count">共 {{ commentTotal }} 条</text>
+        <view class="eva-header-left">
+          <text class="eva-tit">商品评价</text>
+          <text class="eva-count">共 {{ commentTotal }} 条</text>
+        </view>
+        <view v-if="commentTotal > 0" class="eva-more" @click="handleNavToCommentList">
+          <text class="eva-more-text">查看全部评价</text>
+          <text class="eva-arrow">›</text>
+        </view>
       </view>
       <view v-if="commentList.length === 0" class="eva-empty">
         <text>暂无真实评价</text>
@@ -883,6 +889,15 @@ const handleAddToCart = async () => {
   }
 }
 
+// 跳转到全部评价页
+const handleNavToCommentList = () => {
+  const id = product.value.id
+  if (!id) return
+  uni.navigateTo({
+    url: `/pages/comment/list?productId=${id}`,
+  })
+}
+
 // 跳转到品牌详情页
 const handleNavToBrandDetail = () => {
   const id = brand.value.id
@@ -1179,6 +1194,46 @@ page {
     min-height: 90rpx;
     color: $font-color-light;
     font-size: $font-base;
+  }
+
+  .eva-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 70rpx;
+
+    .eva-header-left {
+      display: flex;
+      align-items: baseline;
+    }
+
+    .eva-tit {
+      font-size: $font-base + 2rpx;
+      color: $font-color-dark;
+    }
+
+    .eva-count {
+      margin-left: 12rpx;
+      font-size: $font-sm;
+      color: $font-color-light;
+    }
+
+    .eva-more {
+      display: flex;
+      align-items: center;
+      padding: 6rpx 0 6rpx 20rpx;
+
+      .eva-more-text {
+        font-size: $font-sm;
+        color: $base-color;
+      }
+
+      .eva-arrow {
+        margin-left: 4rpx;
+        font-size: $font-base;
+        color: $base-color;
+      }
+    }
   }
 
   .e-header {
