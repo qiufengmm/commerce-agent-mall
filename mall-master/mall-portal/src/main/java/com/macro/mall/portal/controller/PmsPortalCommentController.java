@@ -4,6 +4,7 @@ import com.macro.mall.common.api.CommonPage;
 import com.macro.mall.common.api.CommonResult;
 import com.macro.mall.model.PmsComment;
 import com.macro.mall.portal.domain.PmsCommentParam;
+import com.macro.mall.portal.domain.PmsCommentResult;
 import com.macro.mall.portal.service.PmsPortalCommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +40,14 @@ public class PmsPortalCommentController {
                                                      @RequestParam(required = false, defaultValue = "1") Integer pageNum,
                                                      @RequestParam(required = false, defaultValue = "5") Integer pageSize) {
         return CommonResult.success(commentService.list(productId, pageNum, pageSize));
+    }
+
+    @Operation(summary = "分页查询当前会员自己的评价")
+    @RequestMapping(value = "/mine", method = RequestMethod.GET)
+    @ResponseBody
+    public CommonResult<CommonPage<PmsCommentResult>> mine(@RequestParam(required = false, defaultValue = "1") Integer pageNum,
+                                                           @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return CommonResult.success(commentService.listMy(pageNum, pageSize));
     }
 
     @Operation(summary = "判断订单明细是否已评价")

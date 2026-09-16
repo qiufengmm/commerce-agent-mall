@@ -192,6 +192,22 @@
       }
     },
     {
+      "path": "pages/comment/list",
+      "style": {
+        "navigationBarTitleText": "全部评价",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 50
+      }
+    },
+    {
+      "path": "pages/comment/mine",
+      "style": {
+        "navigationBarTitleText": "我的评价",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 50
+      }
+    },
+    {
       "path": "pages/money/pay",
       "style": {
         "navigationBarTitleText": "支付订单"

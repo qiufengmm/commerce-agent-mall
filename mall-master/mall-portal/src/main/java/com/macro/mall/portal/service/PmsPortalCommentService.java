@@ -3,6 +3,7 @@ package com.macro.mall.portal.service;
 import com.macro.mall.common.api.CommonPage;
 import com.macro.mall.model.PmsComment;
 import com.macro.mall.portal.domain.PmsCommentParam;
+import com.macro.mall.portal.domain.PmsCommentResult;
 
 /**
  * 商品评价管理Service
@@ -17,6 +18,11 @@ public interface PmsPortalCommentService {
      * 分页查询某个商品的评价
      */
     CommonPage<PmsComment> list(Long productId, Integer pageNum, Integer pageSize);
+
+    /**
+     * 分页查询当前登录会员自己的评价（包含未公开的评价）
+     */
+    CommonPage<PmsCommentResult> listMy(Integer pageNum, Integer pageSize);
 
     /**
      * 判断某个订单明细是否已经评价过
