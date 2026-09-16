@@ -3,16 +3,23 @@ package com.macro.mall.portal.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.CommonPage;
+import com.macro.mall.common.exception.ApiException;
 import com.macro.mall.mapper.*;
 import com.macro.mall.model.*;
+import com.macro.mall.portal.client.MallSearchClient;
 import com.macro.mall.portal.dao.PortalProductDao;
+import com.macro.mall.portal.domain.EsProductDTO;
 import com.macro.mall.portal.domain.PmsPortalProductDetail;
 import com.macro.mall.portal.domain.PmsProductCategoryNode;
 import com.macro.mall.portal.service.PmsPortalProductService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,6 +28,12 @@ import java.util.stream.Collectors;
  */
 @Service
 public class PmsPortalProductServiceImpl implements PmsPortalProductService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PmsPortalProductServiceImpl.class);
+    /**
+     * 对外分页默认值：1-based 页码
+     */
+    private static final int DEFAULT_PAGE_NUM = 1;
+    private static final int DEFAULT_PAGE_SIZE = 5;
     @Autowired
     private PmsProductMapper productMapper;
     @Autowired
@@ -39,9 +52,45 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
     private PmsProductFullReductionMapper productFullReductionMapper;
     @Autowired
     private PortalProductDao portalProductDao;
+    @Autowired
+    private MallSearchClient mallSearchClient;
 
     @Override
-    public List<PmsProduct> search(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize, Integer sort) {
+    public CommonPage<PmsProduct> search(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize, Integer sort) {
+        //对外统一使用 1-based 分页
+        int currentPageNum = pageNum == null || pageNum < DEFAULT_PAGE_NUM ? DEFAULT_PAGE_NUM : pageNum;
+        int currentPageSize = pageSize == null || pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("开始查询商品，参数: keyword={}, brandId={}, productCategoryId={}, pageNum={}, pageSize={}, sort={}",
+                    keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
+        }
+        CommonPage<EsProductDTO> esProductPage = mallSearchClient.searchProduct(keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
+        List<PmsProduct> productList = CollUtil.isEmpty(esProductPage.getList())
+                ? Collections.emptyList()
+                : esProductPage.getList().stream().map(this::convertEsProduct).collect(Collectors.toList());
+        CommonPage<PmsProduct> result = new CommonPage<>();
+        result.setPageNum(currentPageNum);
+        result.setPageSize(currentPageSize);
+        result.setTotalPage(esProductPage.getTotalPage() == null ? 0 : esProductPage.getTotalPage());
+        result.setTotal(esProductPage.getTotal() == null ? 0L : esProductPage.getTotal());
+        result.setList(productList);
+        return result;
+    }
+
+    /**
+     * 将搜索服务返回的商品信息转换为前台商品模型
+     */
+    private PmsProduct convertEsProduct(EsProductDTO esProduct) {
+        PmsProduct product = new PmsProduct();
+        BeanUtils.copyProperties(esProduct, product);
+        return product;
+    }
+
+    /**
+     * 原有 MySQL 综合搜索实现，保留用于后续降级方案，当前不在主链路调用
+     */
+    @Override
+    public List<PmsProduct> searchByMySql(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize, Integer sort) {
         PageHelper.startPage(pageNum, pageSize);
         PmsProductExample example = new PmsProductExample();
         PmsProductExample.Criteria criteria = example.createCriteria();
