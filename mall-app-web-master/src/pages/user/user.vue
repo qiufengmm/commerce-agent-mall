@@ -111,7 +111,12 @@
           title="我的收藏"
           @eventClick="handleNavTo('/pages/user/productCollection')"
         ></mix-list-cell>
-        <mix-list-cell icon="icon-pingjia" iconColor="#ee883b" title="我的评价"></mix-list-cell>
+        <mix-list-cell
+          icon="icon-pingjia"
+          iconColor="#ee883b"
+          title="我的评价"
+          @eventClick="handleNavTo('/pages/comment/mine')"
+        ></mix-list-cell>
         <mix-list-cell
           icon="icon-shezhi1"
           iconColor="#e07472"

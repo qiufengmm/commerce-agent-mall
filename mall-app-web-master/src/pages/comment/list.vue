@@ -77,6 +77,10 @@ const pageSize = ref(10)
 const loading = ref(true)
 // 加载更多状态
 const loadingType = ref<'more' | 'loading' | 'nomore'>('more')
+// 是否有请求正在执行，用于防止并发请求
+const requesting = ref(false)
+// 请求序号，用于丢弃过期响应
+let requestSeq = 0
 
 // ===== 格式化方法 =====
 // 格式化星级展示
@@ -120,40 +124,58 @@ const formatDateTime = (time?: string): string => {
 // ===== 数据加载 =====
 // 加载评价列表，type: refresh-下拉刷新 add-上拉加载
 const loadData = async (type: 'refresh' | 'add' = 'add') => {
-  if (!productId.value) return
+  const stopRefresh = () => {
+    if (type === 'refresh') {
+      uni.stopPullDownRefresh()
+    }
+  }
+
+  if (!productId.value) {
+    // 商品id缺失时也要结束下拉刷新动画，避免一直转圈
+    stopRefresh()
+    return
+  }
+  // 已有请求在执行，直接忽略本次触发，避免并发请求导致重复或乱序
+  if (requesting.value) {
+    stopRefresh()
+    return
+  }
   if (type === 'add' && loadingType.value === 'nomore') return
 
-  loadingType.value = 'loading'
+  // 本次请求要查询的页码：刷新固定查第一页，加载更多沿用当前页码
+  const currentPage = type === 'refresh' ? 1 : pageNum.value
+  const currentSeq = ++requestSeq
 
-  if (type === 'refresh') {
-    pageNum.value = 1
-    commentList.value = []
-  }
+  requesting.value = true
+  loadingType.value = 'loading'
 
   try {
     const res = await getCommentListAPI({
       productId: productId.value,
-      pageNum: pageNum.value,
+      pageNum: currentPage,
       pageSize: pageSize.value,
     })
+    // 期间已发起过新的请求，丢弃本次过期响应
+    if (currentSeq !== requestSeq) return
+
     const dataList = res.data.list || []
     total.value = res.data.total || 0
 
-    if (dataList.length < pageSize.value) {
-      loadingType.value = 'nomore'
-    } else {
-      loadingType.value = 'more'
-    }
-    commentList.value = commentList.value.concat(dataList)
+    // 刷新成功后替换数据，加载更多成功后追加数据
+    commentList.value = type === 'refresh' ? dataList : commentList.value.concat(dataList)
+    // 页码只在请求成功后推进，失败时不跳过页码
+    pageNum.value = currentPage + 1
+    loadingType.value = dataList.length < pageSize.value ? 'nomore' : 'more'
   } catch (error) {
     console.error('加载商品评价失败', error)
-    // 加载失败回退页码，避免跳过某一页
-    if (type === 'add' && pageNum.value > 1) {
-      pageNum.value -= 1
-    }
+    if (currentSeq !== requestSeq) return
+    // 失败后保持页码不变，允许再次触底重新请求同一页
     loadingType.value = 'more'
   } finally {
-    loading.value = false
+    if (currentSeq === requestSeq) {
+      requesting.value = false
+      loading.value = false
+    }
     if (type === 'refresh') {
       uni.stopPullDownRefresh()
     }
@@ -178,9 +200,8 @@ onPullDownRefresh(() => {
 
 // ===== onReachBottom =====
 onReachBottom(() => {
-  if (loadingType.value === 'nomore') return
-  pageNum.value += 1
-  loadData()
+  // 页码不在触底时自增，由 loadData 在请求成功后统一推进
+  loadData('add')
 })
 
 // ===== 事件处理方法 =====
