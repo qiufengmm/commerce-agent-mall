@@ -7,18 +7,21 @@ import com.macro.mall.dao.*;
 import com.macro.mall.dto.PmsProductParam;
 import com.macro.mall.dto.PmsProductQueryParam;
 import com.macro.mall.dto.PmsProductResult;
+import com.macro.mall.event.ProductSyncEvent;
 import com.macro.mall.mapper.*;
 import com.macro.mall.model.*;
 import com.macro.mall.service.PmsProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -63,6 +66,8 @@ public class PmsProductServiceImpl implements PmsProductService {
     private PmsProductDao productDao;
     @Autowired
     private PmsProductVertifyRecordDao productVertifyRecordDao;
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public int create(PmsProductParam productParam) {
@@ -89,6 +94,8 @@ public class PmsProductServiceImpl implements PmsProductService {
         relateAndInsertList(subjectProductRelationDao, productParam.getSubjectProductRelationList(), productId);
         //关联优选
         relateAndInsertList(prefrenceAreaProductRelationDao, productParam.getPrefrenceAreaProductRelationList(), productId);
+        //商品属性、sku、促销关系都处理完成后再发布同步事件，事务提交成功后才会真正同步ES索引
+        publishSyncEvent(productId);
         count = 1;
         return count;
     }
@@ -155,6 +162,8 @@ public class PmsProductServiceImpl implements PmsProductService {
         prefrenceAreaExample.createCriteria().andProductIdEqualTo(id);
         prefrenceAreaProductRelationMapper.deleteByExample(prefrenceAreaExample);
         relateAndInsertList(prefrenceAreaProductRelationDao, productParam.getPrefrenceAreaProductRelationList(), id);
+        //商品属性、sku、促销关系都处理完成后再发布同步事件，事务提交成功后才会真正同步ES索引
+        publishSyncEvent(id);
         count = 1;
         return count;
     }
@@ -257,7 +266,10 @@ public class PmsProductServiceImpl implements PmsProductService {
         record.setPublishStatus(publishStatus);
         PmsProductExample example = new PmsProductExample();
         example.createCriteria().andIdIn(ids);
-        return productMapper.updateByExampleSelective(record, example);
+        int count = productMapper.updateByExampleSelective(record, example);
+        //上下架会改变商品是否需要出现在ES索引中，发布同步事件，事务提交后才会真正同步
+        publishSyncEvent(ids);
+        return count;
     }
 
     @Override
@@ -266,7 +278,9 @@ public class PmsProductServiceImpl implements PmsProductService {
         record.setRecommandStatus(recommendStatus);
         PmsProductExample example = new PmsProductExample();
         example.createCriteria().andIdIn(ids);
-        return productMapper.updateByExampleSelective(record, example);
+        int count = productMapper.updateByExampleSelective(record, example);
+        publishSyncEvent(ids);
+        return count;
     }
 
     @Override
@@ -275,7 +289,9 @@ public class PmsProductServiceImpl implements PmsProductService {
         record.setNewStatus(newStatus);
         PmsProductExample example = new PmsProductExample();
         example.createCriteria().andIdIn(ids);
-        return productMapper.updateByExampleSelective(record, example);
+        int count = productMapper.updateByExampleSelective(record, example);
+        publishSyncEvent(ids);
+        return count;
     }
 
     @Override
@@ -284,7 +300,10 @@ public class PmsProductServiceImpl implements PmsProductService {
         record.setDeleteStatus(deleteStatus);
         PmsProductExample example = new PmsProductExample();
         example.createCriteria().andIdIn(ids);
-        return productMapper.updateByExampleSelective(record, example);
+        int count = productMapper.updateByExampleSelective(record, example);
+        //删除的商品必须从ES索引中剔除
+        publishSyncEvent(ids);
+        return count;
     }
 
     @Override
@@ -297,6 +316,36 @@ public class PmsProductServiceImpl implements PmsProductService {
             productExample.or().andDeleteStatusEqualTo(0).andProductSnLike("%" + keyword + "%");
         }
         return productMapper.selectByExample(productExample);
+    }
+
+    /**
+     * 发布单个商品的索引同步事件，有事务时在MySQL事务提交后触发，没有事务时立即触发
+     * 发布失败只记录warn日志，不回滚也不影响商品操作结果
+     */
+    private void publishSyncEvent(Long id) {
+        try {
+            if (id == null) {
+                return;
+            }
+            eventPublisher.publishEvent(new ProductSyncEvent(Collections.singletonList(id)));
+        } catch (Exception e) {
+            LOGGER.warn("发布商品索引同步事件失败，商品id:{}，原因:{}", id, e.getMessage());
+        }
+    }
+
+    /**
+     * 发布批量商品的索引同步事件，有事务时在MySQL事务提交后触发，没有事务时立即触发
+     * 发布失败只记录warn日志，不回滚也不影响商品操作结果
+     */
+    private void publishSyncEvent(List<Long> ids) {
+        try {
+            if (CollectionUtils.isEmpty(ids)) {
+                return;
+            }
+            eventPublisher.publishEvent(new ProductSyncEvent(ids));
+        } catch (Exception e) {
+            LOGGER.warn("发布商品索引同步事件失败，商品id:{}，原因:{}", ids, e.getMessage());
+        }
     }
 
     /**

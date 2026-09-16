@@ -13,6 +13,7 @@ import com.macro.mall.search.domain.EsProduct;
 import com.macro.mall.search.domain.EsProductRelatedInfo;
 import com.macro.mall.search.repository.EsProductRepository;
 import com.macro.mall.search.service.EsProductService;
+import com.macro.mall.search.util.SearchPageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,14 +84,65 @@ public class EsProductServiceImpl implements EsProductService {
     }
 
     @Override
+    public void sync(Long id) {
+        if (id == null) {
+            return;
+        }
+        sync(Collections.singletonList(id));
+    }
+
+    @Override
+    public void sync(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return;
+        }
+        List<Long> distinctIds = ids.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(distinctIds)) {
+            return;
+        }
+        //只查询未删除且已上架的商品，查不到的商品需要从索引中剔除
+        List<EsProduct> esProductList = productDao.getEsProductListByIds(distinctIds);
+        Map<Long, EsProduct> esProductMap = new HashMap<>();
+        for (EsProduct esProduct : esProductList) {
+            esProductMap.putIfAbsent(esProduct.getId(), esProduct);
+        }
+        List<EsProduct> saveList = new ArrayList<>();
+        List<Long> deleteIdList = new ArrayList<>();
+        for (Long id : distinctIds) {
+            EsProduct esProduct = esProductMap.get(id);
+            if (esProduct != null) {
+                saveList.add(esProduct);
+            } else {
+                deleteIdList.add(id);
+            }
+        }
+        if (!CollectionUtils.isEmpty(saveList)) {
+            productRepository.saveAll(saveList);
+        }
+        for (Long id : deleteIdList) {
+            deleteDocumentQuietly(id);
+        }
+    }
+
+    /**
+     * 删除ES中不存在的文档时不做处理，保证同步操作可重复执行
+     */
+    private void deleteDocumentQuietly(Long id) {
+        if (!productRepository.existsById(id)) {
+            return;
+        }
+        productRepository.deleteById(id);
+    }
+
+    @Override
     public Page<EsProduct> search(String keyword, Integer pageNum, Integer pageSize) {
-        Pageable pageable = PageRequest.of(pageNum, pageSize);
+        Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         return productRepository.findByNameOrSubTitleOrKeywords(keyword, keyword, keyword, pageable);
     }
 
     @Override
     public Page<EsProduct> search(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize,Integer sort) {
-        Pageable pageable = PageRequest.of(pageNum, pageSize);
+        Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         NativeQueryBuilder nativeQueryBuilder = new NativeQueryBuilder();
         //分页
         nativeQueryBuilder.withPageable(pageable);
@@ -158,7 +210,7 @@ public class EsProductServiceImpl implements EsProductService {
 
     @Override
     public Page<EsProduct> recommend(Long id, Integer pageNum, Integer pageSize) {
-        Pageable pageable = PageRequest.of(pageNum, pageSize);
+        Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         List<EsProduct> esProductList = productDao.getAllEsProductList(id);
         if (esProductList.size() > 0) {
             EsProduct esProduct = esProductList.get(0);

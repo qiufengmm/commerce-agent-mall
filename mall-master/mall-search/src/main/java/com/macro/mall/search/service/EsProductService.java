@@ -31,6 +31,16 @@ public interface EsProductService {
     void delete(List<Long> ids);
 
     /**
+     * 同步单个商品到ES，商品可上架则保存或更新文档，否则删除文档，幂等
+     */
+    void sync(Long id);
+
+    /**
+     * 批量同步商品到ES，商品可上架则保存或更新文档，否则删除文档，幂等
+     */
+    void sync(List<Long> ids);
+
+    /**
      * 根据关键字通过名称或副标题查询商品
      */
     Page<EsProduct> search(String keyword, Integer pageNum, Integer pageSize);
