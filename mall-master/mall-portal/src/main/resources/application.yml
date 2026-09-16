@@ -35,6 +35,7 @@ secure:
       - /product/**
       - /brand/**
       - /alipay/**
+      - /comment/list
 
 springdoc:
   swagger-ui:

@@ -8,4 +8,14 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'development',
   },
   plugins: [uni()],
+  server: {
+    proxy: {
+      // 开发环境同源代理：前端请求 /api/** 由 Vite 转发到后端 mall-portal，避免跨域问题
+      '/api': {
+        target: 'http://localhost:8085',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

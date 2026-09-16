@@ -96,8 +96,31 @@
 
     <!-- 评价 -->
     <view class="eva-section">
-      <view class="eva-empty">
+      <view class="eva-header">
+        <text class="eva-tit">商品评价</text>
+        <text class="eva-count">共 {{ commentTotal }} 条</text>
+      </view>
+      <view v-if="commentList.length === 0" class="eva-empty">
         <text>暂无真实评价</text>
+      </view>
+      <view v-else class="eva-list">
+        <view v-for="item in commentList" :key="item.id" class="eva-item">
+          <image
+            v-if="item.memberIcon"
+            class="portrait"
+            :src="item.memberIcon"
+            mode="aspectFill"
+          ></image>
+          <view v-else class="portrait portrait-text">{{ formatFirstChar(item.memberNickName) }}</view>
+          <view class="eva-right">
+            <view class="eva-info">
+              <text class="eva-name">{{ formatNickName(item.memberNickName) }}</text>
+              <text class="eva-star">{{ formatStar(item.star) }}</text>
+              <text class="eva-time">{{ formatDateTime(item.createTime) }}</text>
+            </view>
+            <text class="eva-con">{{ item.content }}</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -237,6 +260,7 @@
 import { ref, computed } from 'vue'
 import { onLoad, onPageScroll } from '@dcloudio/uni-app'
 import { getProductDetailAPI } from '@/apis/product'
+import { getCommentListAPI } from '@/apis/comment'
 import { addCartAPI } from '@/apis/cart'
 import { getProductCouponListAPI, addMemberCouponAPI } from '@/apis/coupon'
 import { createReadHistoryAPI } from '@/apis/memberReadHistory'
@@ -258,6 +282,7 @@ import type {
   ShareItem,
 } from '@/types/product'
 import type { PmsBrand } from '@/types/brand'
+import type { PmsComment } from '@/types/comment'
 import type { SmsCoupon } from '@/types/coupon'
 import { formatDate } from '@/utils/date'
 import { goBackOrHome } from '@/utils/navigation'
@@ -327,6 +352,10 @@ const serviceList = ref<string[]>([])
 // 优惠券
 const couponList = ref<SmsCoupon[]>([])
 
+// 商品评价
+const commentList = ref<PmsComment[]>([])
+const commentTotal = ref(0)
+
 // 格式化时间（保留到秒）
 const formatDateTime = (time: string | null | undefined): string => {
   if (!time) return 'N/A'
@@ -379,10 +408,44 @@ const loadData = async (id: number) => {
       initProductDesc()
       saveReadHistory()
       initProductCollection()
+      loadCommentList(id)
     }
   } catch (error) {
     console.error('加载商品详情失败:', error)
   }
+}
+
+// 加载商品真实评价
+const loadCommentList = async (id: number) => {
+  if (!id) return
+
+  try {
+    const res = await getCommentListAPI({ productId: id, pageNum: 1, pageSize: 5 })
+    commentList.value = res.data.list || []
+    commentTotal.value = res.data.total || 0
+  } catch (error) {
+    console.error('加载商品评价失败:', error)
+    commentList.value = []
+    commentTotal.value = 0
+  }
+}
+
+// 格式化星级展示
+const formatStar = (star: number): string => {
+  const num = star > 5 ? 5 : star < 0 ? 0 : star
+  return '★'.repeat(num) + '☆'.repeat(5 - num)
+}
+
+// 昵称脱敏，保留首尾字符
+const formatNickName = (name: string): string => {
+  if (!name) return '匿名用户'
+  if (name.length <= 2) return name
+  return `${name[0]}***${name[name.length - 1]}`
+}
+
+// 取昵称首字符作为默认头像文字
+const formatFirstChar = (name: string): string => {
+  return name ? name[0] : '用'
 }
 
 // ===== onLoad =====

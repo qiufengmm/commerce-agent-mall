@@ -9,6 +9,15 @@ public class PmsComment implements Serializable {
 
     private Long productId;
 
+    @Schema(title = "评价会员id")
+    private Long memberId;
+
+    @Schema(title = "所属订单id")
+    private Long orderId;
+
+    @Schema(title = "订单明细id，一条订单明细只允许评价一次")
+    private Long orderItemId;
+
     private String memberNickName;
 
     private String productName;
@@ -56,6 +65,30 @@ public class PmsComment implements Serializable {
 
     public void setProductId(Long productId) {
         this.productId = productId;
+    }
+
+    public Long getMemberId() {
+        return memberId;
+    }
+
+    public void setMemberId(Long memberId) {
+        this.memberId = memberId;
+    }
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+
+    public Long getOrderItemId() {
+        return orderItemId;
+    }
+
+    public void setOrderItemId(Long orderItemId) {
+        this.orderItemId = orderItemId;
     }
 
     public String getMemberNickName() {
@@ -170,6 +203,9 @@ public class PmsComment implements Serializable {
         sb.append("Hash = ").append(hashCode());
         sb.append(", id=").append(id);
         sb.append(", productId=").append(productId);
+        sb.append(", memberId=").append(memberId);
+        sb.append(", orderId=").append(orderId);
+        sb.append(", orderItemId=").append(orderItemId);
         sb.append(", memberNickName=").append(memberNickName);
         sb.append(", productName=").append(productName);
         sb.append(", star=").append(star);

@@ -70,7 +70,9 @@
               </button>
             </view>
             <view v-if="item.status === 3" class="action-box b-t">
-              <button class="action-btn recom">评价商品</button>
+              <button class="action-btn recom" @click="handleCommentOrder(item)">
+                评价商品
+              </button>
             </view>
           </view>
 
@@ -260,6 +262,21 @@ const handleReceiveOrder = (orderId: number) => {
         }
       }
     },
+  })
+}
+
+// 评价商品：单商品订单直接进评价页，多商品订单先进详情选择具体商品
+const handleCommentOrder = (order: OmsOrderDetail) => {
+  const itemList = order.orderItemList || []
+  if (itemList.length !== 1) {
+    uni.navigateTo({
+      url: `/pages/order/orderDetail?orderId=${order.id}`,
+    })
+    return
+  }
+  const item = itemList[0]
+  uni.navigateTo({
+    url: `/pages/comment/comment?orderId=${order.id}&orderItemId=${item.id}&productName=${encodeURIComponent(item.productName)}&productPic=${encodeURIComponent(item.productPic)}`,
   })
 }
 

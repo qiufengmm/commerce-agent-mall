@@ -180,6 +180,21 @@ public class PmsCommentExample {
             return (Criteria) this;
         }
 
+        public Criteria andMemberIdEqualTo(Long value) {
+            addCriterion("member_id =", value, "memberId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOrderIdEqualTo(Long value) {
+            addCriterion("order_id =", value, "orderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOrderItemIdEqualTo(Long value) {
+            addCriterion("order_item_id =", value, "orderItemId");
+            return (Criteria) this;
+        }
+
         public Criteria andProductIdNotEqualTo(Long value) {
             addCriterion("product_id <>", value, "productId");
             return (Criteria) this;

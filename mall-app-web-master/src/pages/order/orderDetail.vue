@@ -42,6 +42,15 @@
             <text class="number">x {{ item.productQuantity }}</text>
           </view>
         </view>
+        <view
+          v-if="order.status === 3"
+          class="comment-action"
+          @click="handleCommentItem(item)"
+        >
+          <text class="comment-btn" :class="{ done: commentedMap[item.id] }">
+            {{ commentedMap[item.id] ? '已评价' : '评价' }}
+          </text>
+        </view>
       </view>
     </view>
 
@@ -115,7 +124,7 @@
       </view>
       <view class="action-box b-t" v-if="order.status === 3">
         <button class="action-btn">申请售后</button>
-        <button class="action-btn recom">评价商品</button>
+        <button class="action-btn recom" @click="handleCommentOrder">评价商品</button>
       </view>
       <view class="price-content" v-if="order.status === 0">
         <text>应付金额</text>
@@ -131,7 +140,9 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { formatDate } from '@/utils/date'
 import { getOrderDetailAPI, cancelUserOrderAPI, confirmReceiveOrderAPI } from '@/apis/order'
+import { checkCommentExistsAPI } from '@/apis/comment'
 import type { OmsOrderDetail } from '@/types/order'
+import type { OmsOrderItem } from '@/types/order'
 
 // ===== 页面数据 =====
 // 订单ID
@@ -140,6 +151,8 @@ const orderId = ref<number>(0)
 const order = ref<OmsOrderDetail>({} as OmsOrderDetail)
 // 订单状态信息
 const orderStatus = ref<{ text: string; image: string }>({ text: '', image: '' })
+// 订单明细是否已评价，key 为订单明细id
+const commentedMap = ref<Record<number, boolean>>({})
 
 // ===== loadData =====
 // 加载订单详情
@@ -148,9 +161,50 @@ const loadData = async () => {
     const res = await getOrderDetailAPI(orderId.value)
     order.value = res.data
     setOrderStatus(order.value.status)
+    await loadCommentStatus()
   } catch (e) {
     console.error('加载订单详情失败', e)
   }
+}
+
+// ===== 评价相关 =====
+
+// 加载每个订单明细是否已评价
+const loadCommentStatus = async () => {
+  commentedMap.value = {}
+  if (order.value.status !== 3) {
+    return
+  }
+  const itemList = order.value.orderItemList || []
+  for (const item of itemList) {
+    try {
+      const res = await checkCommentExistsAPI({ orderItemId: item.id })
+      commentedMap.value[item.id] = res.data
+    } catch (e) {
+      commentedMap.value[item.id] = false
+    }
+  }
+}
+
+// 评价某个订单明细
+const handleCommentItem = (item: OmsOrderItem) => {
+  if (commentedMap.value[item.id]) {
+    uni.showToast({ title: '该商品已评价', icon: 'none' })
+    return
+  }
+  uni.navigateTo({
+    url: `/pages/comment/comment?orderId=${order.value.id}&orderItemId=${item.id}&productName=${encodeURIComponent(item.productName)}&productPic=${encodeURIComponent(item.productPic)}`,
+  })
+}
+
+// 底部评价商品按钮：单商品直接评价，多商品提示选择具体商品
+const handleCommentOrder = () => {
+  const itemList = order.value.orderItemList || []
+  if (itemList.length !== 1) {
+    uni.showToast({ title: '请选择要评价的商品', icon: 'none' })
+    return
+  }
+  handleCommentItem(itemList[0])
 }
 
 // ===== onLoad =====
@@ -387,6 +441,26 @@ page {
       flex: 1;
       padding-left: 24rpx;
       overflow: hidden;
+    }
+
+    .comment-action {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding-left: 16rpx;
+
+      .comment-btn {
+        padding: 8rpx 24rpx;
+        font-size: $font-sm;
+        color: #fff;
+        background: $base-color;
+        border-radius: 24rpx;
+      }
+
+      .comment-btn.done {
+        color: $font-color-light;
+        background: #f5f5f5;
+      }
     }
 
     .title {

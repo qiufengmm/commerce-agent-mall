@@ -186,6 +186,12 @@
       }
     },
     {
+      "path": "pages/comment/comment",
+      "style": {
+        "navigationBarTitleText": "评价商品"
+      }
+    },
+    {
       "path": "pages/money/pay",
       "style": {
         "navigationBarTitleText": "支付订单"

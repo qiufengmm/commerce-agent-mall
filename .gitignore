@@ -9,6 +9,10 @@
 **/.idea/
 **/.vscode/
 
+# 微信开发者工具本机项目配置
+mall-app-web-master/project.config.json
+mall-app-web-master/project.private.config.json
+
 # 当前项目的本地 Codex 子代理配置
 .codex/
 
