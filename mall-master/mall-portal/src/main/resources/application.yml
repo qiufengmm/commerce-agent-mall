@@ -75,3 +75,16 @@ rabbitmq:
     name:
       cancelOrder: cancelOrderQueue
 
+# 搜索服务（mall-search）内部调用配置，不对外暴露
+mall:
+  search:
+    # 搜索服务地址，可通过环境变量 MALL_SEARCH_BASE_URL 覆盖
+    base-url: ${MALL_SEARCH_BASE_URL:http://localhost:8081}
+    # 搜索服务综合搜索接口路径
+    search-path: /esProduct/search
+    # 连接超时时间(毫秒)
+    connect-timeout-millis: 3000
+    # 读取超时时间(毫秒)
+    read-timeout-millis: 5000
+    # 门户对外与 mall-search 已统一为 1-based 页码，页码原样透传，不再提供页码基准配置
+
