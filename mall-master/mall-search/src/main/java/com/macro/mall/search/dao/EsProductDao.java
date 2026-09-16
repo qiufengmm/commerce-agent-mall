@@ -13,4 +13,9 @@ public interface EsProductDao {
      * 获取指定ID的搜索商品
      */
     List<EsProduct> getAllEsProductList(@Param("id") Long id);
+
+    /**
+     * 根据商品ID集合获取可上架的搜索商品
+     */
+    List<EsProduct> getEsProductListByIds(@Param("ids") List<Long> ids);
 }

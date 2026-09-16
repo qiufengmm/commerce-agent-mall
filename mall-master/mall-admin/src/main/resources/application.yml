@@ -49,6 +49,20 @@ secure:
       - /minio/upload
       - /aliyun/oss/policy
 
+mall:
+  search:
+    # 搜索服务(mall-search)地址，可通过环境变量MALL_SEARCH_BASE_URL覆盖
+    base-url: ${MALL_SEARCH_BASE_URL:http://localhost:8081}
+    # 连接超时时间(毫秒)
+    connect-timeout: 2000
+    # 读取超时时间(毫秒)
+    read-timeout: 5000
+    # 内部服务调用令牌，与mall-search共用环境变量MALL_SEARCH_INTERNAL_TOKEN，仓库内不存放真实令牌
+    # 未配置时同步请求会被跳过并记录warn日志，不会静默失败
+    internal-token: ${MALL_SEARCH_INTERNAL_TOKEN:}
+    # 单次批量同步商品id数量上限，需与mall-search的max-sync-batch-size保持一致
+    max-sync-batch-size: 100
+
 springdoc:
   swagger-ui:
     # 修改Swagger UI路径

@@ -15,6 +15,14 @@ mybatis:
     - classpath:dao/*.xml
     - classpath*:com/**/mapper/*.xml
 
+mall:
+  search:
+    # 内部服务调用令牌，本地启动前需导出环境变量MALL_SEARCH_INTERNAL_TOKEN（mall-admin与mall-search使用同一个值），仓库内不存放真实令牌
+    # 未配置时同步接口(/esProduct/sync/**)会返回503并记录error日志，不会静默放行
+    internal-token: ${MALL_SEARCH_INTERNAL_TOKEN:}
+    # 单次批量同步商品id数量上限，超过上限返回400
+    max-sync-batch-size: 100
+
 springdoc:
   swagger-ui:
     # 修改Swagger UI路径
