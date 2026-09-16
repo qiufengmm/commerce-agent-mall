@@ -123,6 +123,12 @@ export const asyncRouterMap: RouteRecordExt[] = [
         meta: { title: '编辑品牌' },
         hidden: true,
       },
+      {
+        path: 'comment',
+        name: 'productComment',
+        component: () => import('@/views/pms/comment/index.vue'),
+        meta: { title: '商品评价', icon: 'product-comment' },
+      },
     ],
   },
   {

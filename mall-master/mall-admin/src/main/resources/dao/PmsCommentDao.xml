@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.dao.PmsCommentDao">
+    <resultMap id="commentMap" type="com.macro.mall.model.PmsComment"
+               extends="com.macro.mall.mapper.PmsCommentMapper.ResultMapWithBLOBs">
+    </resultMap>
+
+    <select id="getList" resultMap="commentMap">
+        select *
+        from pms_comment
+        <where>
+            <if test="queryParam.productKeyword!=null and queryParam.productKeyword!=''">
+                and product_name like concat('%', #{queryParam.productKeyword}, '%')
+            </if>
+            <if test="queryParam.memberNickName!=null and queryParam.memberNickName!=''">
+                and member_nick_name like concat('%', #{queryParam.memberNickName}, '%')
+            </if>
+            <if test="queryParam.showStatus!=null">
+                and show_status = #{queryParam.showStatus}
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <update id="refreshReplayCount">
+        update pms_comment
+        set replay_count = (select count(1) from pms_comment_replay where comment_id = #{commentId})
+        where id = #{commentId}
+    </update>
+</mapper>
