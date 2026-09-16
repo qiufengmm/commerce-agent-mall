@@ -5,12 +5,28 @@
 ## 1. 项目与工作树
 
 - 项目根目录：`F:\code\mall`
-- 后台管理工作树：`F:\code\mall\.worktrees\comment-admin`
-- 会员端工作树：`F:\code\mall\.worktrees\comment-member`
-- 后台任务只能修改 `comment-admin`，会员端任务只能修改 `comment-member`。
+- 后端：`F:\code\mall\mall-master`
+- 管理后台：`F:\code\mall\mall-admin-web-master`
+- H5/移动端：`F:\code\mall\mall-app-web-master`
+- 已完成任务的旧工作树（仅保留历史）：`comment-admin`、`comment-member`
+- 新功能必须从最新 `main` 创建新的分支和 worktree，例如 `feature/es-search-admin`、`feature/es-search-member`。
+- 后台、门户和移动端任务按文件边界分配到对应工作树，不混用工作树。
 - 不混用工作树，不直接在 `main` 上实现功能。
+- 工作树实现阶段禁止执行 `git commit`、`git push` 和 `git merge`，由主 Agent 统一处理。
+
+主要技术栈：
+
+- 后端：Java 17、Spring Boot、MyBatis、MySQL、Redis、RabbitMQ、Elasticsearch
+- 管理后台：Vue 3、TypeScript、Vite、Element Plus
+- 移动端：uni-app、Vue 3、TypeScript、Pinia
+- 搜索服务：`mall-search`，默认端口 `8081`
+- 门户服务：`mall-portal`，默认端口 `8085`
+- 管理服务：`mall-admin`，默认端口 `8080`
+- Elasticsearch：默认地址 `localhost:9200`
 
 ## 2. 标准工作流
+
+主 Agent 负责需求分析、架构设计、任务拆解、代码审查、验证和 Git 流程管理；不得在没有说明和审查的情况下直接修改核心业务代码。
 
 1. 用户提出需求后，主 Agent 先说明业务流程、实现架构、关键文件、接口/数据库影响和验收标准。
 2. 主 Agent 将需求拆成后台端和会员端任务，分别生成可直接复制的详细提示词。
@@ -35,15 +51,16 @@
 - 接口、权限和数据库约束；
 - 异常处理和验收标准；
 - 测试/构建命令；
-- 禁止提交 Git、推送远程或扩大任务范围；
-- 完成后返回修改文件、关键位置、验证结果和遗留问题。
+- 禁止提交 Git、推送远程、合并分支或扩大任务范围；
+- 完成后按规定的完整 Markdown 格式返回结果。
 - 后台工作树和会员工作树都必须使用完整 Markdown 返回结果，不得只回复“已完成”或发送零散片段；返回至少包含“完成概述、修改文件与关键位置、业务/API 影响、验证命令与结果、Git 状态、遗留问题”六个部分。
+- 返回内容还必须说明数据库或配置影响，以及后续建议。
 - 返回中的命令、接口、日志和代码必须使用 Markdown 代码块；长结果保持一个连续的 Markdown 文档，避免被拆成无法复制的片段。
 
 提示词的 Markdown 格式必须保持可连续复制：
 
 - 每个工作树提示词使用一个完整、连续的代码块，不在代码块中间插入解释文字。
-- 提示词内部如果还包含代码、命令或接口示例，外层使用四个反引号（````markdown），内层使用三个反引号（```text、```powershell 等），禁止使用相同层级的嵌套代码围栏。
+- 提示词内部如果还包含代码、命令或接口示例，外层使用四个反引号并标记为 markdown，内层使用三个反引号并标记具体语言，禁止使用相同层级的嵌套代码围栏。
 - 如果客户端可能破坏嵌套围栏，改用缩进代码或纯文本示例，确保用户复制后不会丢失段落、命令和约束。
 - 后续返工提示词也遵守同样规则；一个任务一个连续代码块，标题和说明放在代码块外。
 
@@ -58,6 +75,7 @@
 ## 5. Git 与文件安全
 
 - 提交前必须确认不包含 `.env`、`application-dev.yml`、`application-prod.yml`、`node_modules/`、`target/`、`dist/`、数据库备份、密钥和临时迁移文件。
+- `.codebuddy/plans/` 等本地工具生成的临时计划文件默认不提交；需要长期保留时先整理为正式文档。
 - 使用中文提交信息；一个独立功能或清晰逻辑单元使用一个提交。
 - 审查和验证通过后，可以按标准流程在本地合并到 `main`；合并前必须确认 `main` 工作区干净，合并后必须重新验证。
 - 未经用户明确确认，不执行 `git push`；推送前必须确认具体远程仓库和分支。
@@ -65,8 +83,27 @@
 - 禁止批量删除文件或目录，不得使用 `del /s`、`rd /s`、`rmdir /s`、`Remove-Item -Recurse` 或 `rm -rf`。
 - 删除文件时只能处理一个明确路径，并先确认影响范围。
 
-## 6. 汇报要求
+## 6. 当前 Elasticsearch 阶段
 
-每次阶段性汇报必须说明：完成内容、修改文件、审查结论、验证命令、测试结果、Git 提交信息、遗留问题和下一步可选方案。
+当前目标是先完成 Elasticsearch 正常搜索闭环：
+
+```text
+移动端 → mall-portal /product/search → mall-search /esProduct/search → Elasticsearch pms 索引
+```
+
+本阶段要求：
+
+- 前端接口保持 `/product/search` 不变；
+- 移动端不直接请求 `8081`；
+- 搜索服务对外使用 1-based `pageNum`；
+- 后台商品新增、编辑、上下架、删除后同步 ES；
+- ES 索引初始化通过 `/esProduct/importAll` 完成；
+- MySQL 降级搜索作为后续备用方案；
+- 本阶段不删除原有 MySQL 搜索代码；
+- 不修改数据库表结构。
+
+## 7. 汇报要求
+
+每次阶段性汇报必须说明：完成内容、修改文件、审查结论、验证命令、测试结果、Git 提交信息、合并信息、遗留问题和下一步可选方案。
 
 未经实际 diff、只读审查和相关验证，不得宣称功能已完成。
