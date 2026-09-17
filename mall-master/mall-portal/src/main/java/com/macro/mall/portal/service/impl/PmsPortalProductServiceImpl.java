@@ -69,8 +69,9 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
                 ? Collections.emptyList()
                 : esProductPage.getList().stream().map(this::convertEsProduct).collect(Collectors.toList());
         CommonPage<PmsProduct> result = new CommonPage<>();
-        result.setPageNum(currentPageNum);
-        result.setPageSize(currentPageSize);
+        //搜索服务会对页码和每页数量做归一化与上限处理，回显搜索服务实际生效的值，避免响应与真实返回条数不一致
+        result.setPageNum(esProductPage.getPageNum() == null ? currentPageNum : esProductPage.getPageNum());
+        result.setPageSize(esProductPage.getPageSize() == null ? currentPageSize : esProductPage.getPageSize());
         result.setTotalPage(esProductPage.getTotalPage() == null ? 0 : esProductPage.getTotalPage());
         result.setTotal(esProductPage.getTotal() == null ? 0L : esProductPage.getTotal());
         result.setList(productList);

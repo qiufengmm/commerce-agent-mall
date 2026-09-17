@@ -64,6 +64,25 @@ mvn clean package -DskipTests
 - `MallPortalApplication`
 - `MallSearchApplication`
 
+## 商品搜索（Elasticsearch）
+
+商品搜索由独立服务 `mall-search`（默认 `8081`）提供，门户 `mall-portal` 内部转发，移动端仍只访问 `/product/search`：
+
+```text
+移动端 /product/search → mall-portal → mall-search /esProduct/search → Elasticsearch pms 索引
+```
+
+启动顺序与验证步骤（ES 启动、IK 插件、`/esProduct/importAll` 初始化索引、分页与同步的 curl 验证清单、内部令牌配置方式）见：
+
+- [Elasticsearch 商品搜索运行手册](document/es-search/elasticsearch-runbook.md)
+- [示例环境变量](document/es-search/es-search-env.example)
+
+要点：
+
+- `MALL_SEARCH_INTERNAL_TOKEN` 需要在 mall-admin 与 mall-search 配置成同一个值，仓库内不保存真实令牌；
+- 三个服务的 `application.yml` 都不含数据库连接信息，本地启动请通过启动参数或环境变量注入；
+- 未配置令牌时 mall-search 同步接口返回 503，不会静默放行。
+
 ## 后续改造计划
 
 1. 梳理订单状态流转，补充更清晰的业务注释和异常边界。

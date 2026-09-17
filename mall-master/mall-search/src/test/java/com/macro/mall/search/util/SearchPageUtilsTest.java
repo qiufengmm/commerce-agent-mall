@@ -65,6 +65,33 @@ public class SearchPageUtilsTest {
     }
 
     @Test
+    public void testIsBeyondMaxResultWindow() {
+        //from + size 未超过 max_result_window
+        assertEquals(false, SearchPageUtils.isBeyondMaxResultWindow(1, 5));
+        assertEquals(false, SearchPageUtils.isBeyondMaxResultWindow(1, SearchPageUtils.MAX_PAGE_SIZE));
+        //from + size 刚好等于 max_result_window，允许查询
+        assertEquals(false, SearchPageUtils.isBeyondMaxResultWindow(SearchPageUtils.MAX_RESULT_WINDOW / SearchPageUtils.MAX_PAGE_SIZE,
+                SearchPageUtils.MAX_PAGE_SIZE));
+        //from + size 超过 max_result_window
+        assertEquals(true, SearchPageUtils.isBeyondMaxResultWindow(9999, 5));
+        assertEquals(true, SearchPageUtils.isBeyondMaxResultWindow(SearchPageUtils.MAX_RESULT_WINDOW / SearchPageUtils.MAX_PAGE_SIZE + 1,
+                SearchPageUtils.MAX_PAGE_SIZE));
+        assertEquals(true, SearchPageUtils.isBeyondMaxResultWindow(Integer.MAX_VALUE, SearchPageUtils.MAX_PAGE_SIZE));
+        //空值按默认值处理，不会越界
+        assertEquals(false, SearchPageUtils.isBeyondMaxResultWindow(null, null));
+    }
+
+    @Test
+    public void testEmptyPageKeepOneBasedPageNum() {
+        Page<String> page = SearchPageUtils.emptyPage(9999, 5);
+        assertEquals(0, page.getTotalElements());
+        assertEquals(0, page.getContent().size());
+        CommonPage<String> commonPage = SearchPageUtils.restPageOneBased(page);
+        assertEquals(9999, commonPage.getPageNum());
+        assertEquals(5, commonPage.getPageSize());
+    }
+
+    @Test
     public void testRestPageOneBased() {
         Pageable pageable = PageRequest.of(1, 5);
         Page<String> page = new PageImpl<>(List.of("a", "b"), pageable, 12);

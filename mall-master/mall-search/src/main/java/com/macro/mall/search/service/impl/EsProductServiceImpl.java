@@ -136,12 +136,18 @@ public class EsProductServiceImpl implements EsProductService {
 
     @Override
     public Page<EsProduct> search(String keyword, Integer pageNum, Integer pageSize) {
+        if (SearchPageUtils.isBeyondMaxResultWindow(pageNum, pageSize)) {
+            return SearchPageUtils.emptyPage(pageNum, pageSize);
+        }
         Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         return productRepository.findByNameOrSubTitleOrKeywords(keyword, keyword, keyword, pageable);
     }
 
     @Override
     public Page<EsProduct> search(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize,Integer sort) {
+        if (SearchPageUtils.isBeyondMaxResultWindow(pageNum, pageSize)) {
+            return SearchPageUtils.emptyPage(pageNum, pageSize);
+        }
         Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         NativeQueryBuilder nativeQueryBuilder = new NativeQueryBuilder();
         //分页
@@ -210,6 +216,9 @@ public class EsProductServiceImpl implements EsProductService {
 
     @Override
     public Page<EsProduct> recommend(Long id, Integer pageNum, Integer pageSize) {
+        if (SearchPageUtils.isBeyondMaxResultWindow(pageNum, pageSize)) {
+            return SearchPageUtils.emptyPage(pageNum, pageSize);
+        }
         Pageable pageable = SearchPageUtils.toPageable(pageNum, pageSize);
         List<EsProduct> esProductList = productDao.getAllEsProductList(id);
         if (esProductList.size() > 0) {

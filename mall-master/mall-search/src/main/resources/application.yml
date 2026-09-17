@@ -6,6 +6,11 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+  # Elasticsearch 地址，默认与 Spring Boot 内置默认值一致（localhost:9200），
+  # 可通过环境变量 MALL_ES_URIS 覆盖，例如 MALL_ES_URIS=http://127.0.0.1:9200
+  # 注意：仓库中不放 ES 账号密码，开启安全认证时请通过环境变量或启动参数注入
+  elasticsearch:
+    uris: ${MALL_ES_URIS:localhost:9200}
 
 server:
   port: 8081
@@ -18,9 +23,11 @@ mybatis:
 mall:
   search:
     # 内部服务调用令牌，本地启动前需导出环境变量MALL_SEARCH_INTERNAL_TOKEN（mall-admin与mall-search使用同一个值），仓库内不存放真实令牌
-    # 未配置时同步接口(/esProduct/sync/**)会返回503并记录error日志，不会静默放行
+    # 鉴权行为：服务端未配置令牌时同步接口(/esProduct/sync/**)返回503并记录error日志；
+    #          请求缺少X-Internal-Token或令牌不匹配返回401；普通搜索接口不需要令牌
     internal-token: ${MALL_SEARCH_INTERNAL_TOKEN:}
-    # 单次批量同步商品id数量上限，超过上限返回400
+    # 单次批量同步商品id数量上限，请求id数量为空或超过该上限时返回400
+    # 该值需与mall-admin的mall.search.max-sync-batch-size保持一致
     max-sync-batch-size: 100
 
 springdoc:
