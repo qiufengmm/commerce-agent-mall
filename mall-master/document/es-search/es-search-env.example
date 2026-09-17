@@ -1,0 +1,22 @@
+# Elasticsearch 搜索链路示例环境变量
+# 复制本文件后填写真实值，填写后的文件不要提交到仓库。
+
+# mall-search 连接的 Elasticsearch 地址，默认 localhost:9200
+MALL_ES_URIS=http://localhost:9200
+
+# mall-admin / mall-portal 访问 mall-search 的地址
+MALL_SEARCH_BASE_URL=http://localhost:8081
+
+# 内部同步接口令牌，mall-admin 与 mall-search 必须使用同一个值
+# 生成示例：openssl rand -hex 32
+# 未配置时：mall-search 同步接口返回 503，mall-admin 跳过同步并记录 warn 日志
+MALL_SEARCH_INTERNAL_TOKEN=<请自行生成随机令牌>
+
+# 数据库连接信息（仓库内不含数据源配置，本地启动时自行注入）
+# 请使用本机开发库账号，不要提交真实密码
+SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/mall?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+SPRING_DATASOURCE_USERNAME=<数据库账号>
+SPRING_DATASOURCE_PASSWORD=<数据库密码>
+
+# Druid 获取连接的最大等待时间(毫秒)，默认 -1 会无限等待，建议显式设置
+SPRING_DATASOURCE_DRUID_MAX_WAIT=10000

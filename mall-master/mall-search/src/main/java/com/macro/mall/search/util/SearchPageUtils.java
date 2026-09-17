@@ -2,8 +2,11 @@ package com.macro.mall.search.util;
 
 import com.macro.mall.common.api.CommonPage;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+
+import java.util.Collections;
 
 /**
  * 搜索分页参数处理工具
@@ -22,6 +25,10 @@ public final class SearchPageUtils {
      * 每页数量上限，超过该值按上限处理，避免单次拉取过量数据
      */
     public static final int MAX_PAGE_SIZE = 100;
+    /**
+     * Elasticsearch 默认的 index.max_result_window，from + size 超过该值会被ES拒绝
+     */
+    public static final int MAX_RESULT_WINDOW = 10000;
 
     private SearchPageUtils() {
     }
@@ -51,6 +58,23 @@ public final class SearchPageUtils {
      */
     public static Pageable toPageable(Integer pageNum, Integer pageSize) {
         return PageRequest.of(normalizePageNum(pageNum) - 1, normalizePageSize(pageSize));
+    }
+
+    /**
+     * 判断分页偏移量是否超出Elasticsearch的max_result_window。
+     * 超限时ES会返回search_phase_execution_exception，需要提前返回空页而不是把异常抛给调用方。
+     */
+    public static boolean isBeyondMaxResultWindow(Integer pageNum, Integer pageSize) {
+        int size = normalizePageSize(pageSize);
+        long offset = (long) (normalizePageNum(pageNum) - 1) * size;
+        return offset + size > MAX_RESULT_WINDOW;
+    }
+
+    /**
+     * 构造空分页结果，页码与每页数量沿用归一化后的入参，保证对外仍是1-based
+     */
+    public static <T> Page<T> emptyPage(Integer pageNum, Integer pageSize) {
+        return new PageImpl<>(Collections.emptyList(), toPageable(pageNum, pageSize), 0);
     }
 
     /**
