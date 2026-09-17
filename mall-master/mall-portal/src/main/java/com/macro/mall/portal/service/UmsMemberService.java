@@ -45,6 +45,20 @@ public interface UmsMemberService {
      */
     void updateIntegration(Long id,Integer integration);
 
+    /**
+     * 扣减会员积分，只有积分充足时才会成功，成功后清理会员缓存
+     *
+     * @return true 表示扣减成功
+     */
+    boolean deductIntegration(Long id, Integer integration);
+
+    /**
+     * 返还会员积分，成功后清理会员缓存
+     *
+     * @return true 表示返还成功
+     */
+    boolean refundIntegration(Long id, Integer integration);
+
 
     /**
      * 获取用户信息

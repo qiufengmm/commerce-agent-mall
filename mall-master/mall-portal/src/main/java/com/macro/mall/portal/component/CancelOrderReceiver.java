@@ -19,6 +19,7 @@ public class CancelOrderReceiver {
     private OmsPortalOrderService portalOrderService;
     @RabbitHandler
     public void handle(Long orderId){
+        //系统内部入口：只允许取消真正处于待付款状态的订单，已支付订单不会被关闭
         portalOrderService.cancelOrder(orderId);
         LOGGER.info("process orderId:{}",orderId);
     }

@@ -296,7 +296,7 @@
 			"response": []
 		},
 		{
-			"name": "取消单个超时订单",
+			"name": "取消单个超时订单(接口已移除,存在越权风险)",
 			"request": {
 				"url": {
 					"raw": "{{portal.mall}}/order/cancelOrder?orderId=13",
@@ -320,7 +320,7 @@
 				"method": "POST",
 				"header": [],
 				"body": {},
-				"description": ""
+				"description": "该接口已从 OmsPortalOrderController 移除：客户端可传入任意 orderId 将他人待付款订单加入取消队列。超时取消由下单流程在系统内部发送延迟消息，会员取消请改用 /order/cancelUserOrder。"
 			},
 			"response": []
 		}

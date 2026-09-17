@@ -34,7 +34,8 @@ secure:
       - /home/**
       - /product/**
       - /brand/**
-      - /alipay/**
+      # 只放行支付宝异步通知，下单与主动查询必须携带会员 Token，避免被匿名调用
+      - /alipay/notify
       - /comment/list
 
 springdoc:

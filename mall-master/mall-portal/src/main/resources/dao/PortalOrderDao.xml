@@ -13,6 +13,7 @@
             o.order_sn,
             o.coupon_id,
             o.integration,
+            o.use_integration,
             o.member_id,
             ot.id ot_id,
             ot.product_name ot_product_name,
@@ -44,48 +45,70 @@
             LEFT JOIN oms_order_item ot ON o.id = ot.order_id
         WHERE
             o.status = 0
+            AND o.delete_status = 0
             AND o.create_time &lt; date_add(NOW(), INTERVAL -#{minute} MINUTE);
     </select>
 
-    <update id="updateSkuStock">
+    <!--
+      支付成功：只有待付款订单能转为待发货，影响行数为 1 才代表本次调用真正完成支付转换。
+      重复回调时 status 已不是 0，更新命中 0 行，从而保证只扣减一次库存。
+    -->
+    <update id="payOrderIfUnpaid">
+        UPDATE oms_order
+        SET status        = 1,
+            pay_type      = #{payType},
+            payment_time  = NOW(),
+            modify_time   = NOW()
+        WHERE id = #{orderId}
+          AND status = 0
+          AND delete_status = 0
+    </update>
+
+    <!-- 取消/超时关闭：只有待付款订单能转为已关闭，保证已支付订单不会被关闭 -->
+    <update id="closeOrderIfUnpaid">
+        UPDATE oms_order
+        SET status      = 4,
+            modify_time = NOW()
+        WHERE id = #{orderId}
+          AND status = 0
+          AND delete_status = 0
+    </update>
+
+    <!-- 确认收货：只有已发货订单能转为已完成 -->
+    <update id="confirmReceiveIfDelivered">
+        UPDATE oms_order
+        SET status         = 3,
+            confirm_status = 1,
+            receive_time   = NOW(),
+            modify_time    = NOW()
+        WHERE id = #{orderId}
+          AND status = 2
+          AND delete_status = 0
+    </update>
+
+    <!-- 锁定库存：可用库存充足才允许锁定，保证 stock - lock_stock 不为负 -->
+    <update id="lockSkuStock">
         UPDATE pms_sku_stock
-        SET
-            stock = CASE id
-            <foreach collection="itemList" item="item">
-              WHEN #{item.productSkuId} THEN stock - #{item.productQuantity}
-            </foreach>
-            END,
-            lock_stock = CASE id
-            <foreach collection="itemList" item="item">
-              WHEN #{item.productSkuId} THEN lock_stock - #{item.productQuantity}
-            </foreach>
-            END
-        WHERE
-            id IN
-        <foreach collection="itemList" item="item" separator="," open="(" close=")">
-            #{item.productSkuId}
-        </foreach>
+        SET lock_stock = lock_stock + #{quantity}
+        WHERE id = #{skuId}
+          AND stock - lock_stock &gt;= #{quantity}
     </update>
-    <update id="updateOrderStatus">
-        update oms_order
-        set status=#{status}
-        where id in
-        <foreach collection="ids" item="id" separator="," open="(" close=")">
-            #{id}
-        </foreach>
+
+    <!-- 支付成功扣减库存：真实库存与锁定库存同时充足才允许扣减 -->
+    <update id="deductSkuStock">
+        UPDATE pms_sku_stock
+        SET stock      = stock - #{quantity},
+            lock_stock = lock_stock - #{quantity}
+        WHERE id = #{skuId}
+          AND stock &gt;= #{quantity}
+          AND lock_stock &gt;= #{quantity}
     </update>
+
+    <!-- 取消订单释放锁定库存：锁定库存不足时不更新，保证 lock_stock 不为负 -->
     <update id="releaseSkuStockLock">
         UPDATE pms_sku_stock
-        SET
-        lock_stock = CASE id
-        <foreach collection="itemList" item="item">
-            WHEN #{item.productSkuId} THEN lock_stock - #{item.productQuantity}
-        </foreach>
-        END
-        WHERE
-        id IN
-        <foreach collection="itemList" item="item" separator="," open="(" close=")">
-            #{item.productSkuId}
-        </foreach>
+        SET lock_stock = lock_stock - #{quantity}
+        WHERE id = #{skuId}
+          AND lock_stock &gt;= #{quantity}
     </update>
 </mapper>

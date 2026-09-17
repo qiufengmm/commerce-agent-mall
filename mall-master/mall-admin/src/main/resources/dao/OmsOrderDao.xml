@@ -33,36 +33,57 @@
             )
         </if>
     </select>
-    <update id="delivery">
+
+    <!-- 发货：只有待发货（status=1）订单能被更新为已发货，影响行数为 1 才代表发货成功 -->
+    <update id="deliverOne">
         UPDATE oms_order
-        SET
-        delivery_sn = CASE id
-        <foreach collection="list" item="item">
-            WHEN #{item.orderId} THEN #{item.deliverySn}
-        </foreach>
-        END,
-        delivery_company = CASE id
-        <foreach collection="list" item="item">
-            WHEN #{item.orderId} THEN #{item.deliveryCompany}
-        </foreach>
-        END,
-        delivery_time = CASE id
-        <foreach collection="list" item="item">
-            WHEN #{item.orderId} THEN now()
-        </foreach>
-        END,
-        `status` = CASE id
-        <foreach collection="list" item="item">
-            WHEN #{item.orderId} THEN 2
-        </foreach>
-        END
-        WHERE
-        id IN
-        <foreach collection="list" item="item" separator="," open="(" close=")">
-            #{item.orderId}
-        </foreach>
-        AND `status` = 1
+        SET delivery_sn      = #{deliverySn},
+            delivery_company = #{deliveryCompany},
+            delivery_time    = NOW(),
+            status           = 2,
+            modify_time      = NOW()
+        WHERE id = #{orderId}
+          AND status = 1
+          AND delete_status = 0
     </update>
+
+    <!-- 关闭订单：只有待付款（status=0）订单能被关闭，避免越级关闭已支付订单 -->
+    <update id="closeOrderIfUnpaid">
+        UPDATE oms_order
+        SET status      = 4,
+            modify_time = NOW()
+        WHERE id = #{orderId}
+          AND status = 0
+          AND delete_status = 0
+    </update>
+
+    <!-- 释放锁定库存：锁定库存不足时不更新，保证 lock_stock 不为负 -->
+    <update id="releaseSkuStockLock">
+        UPDATE pms_sku_stock
+        SET lock_stock = lock_stock - #{quantity}
+        WHERE id = #{skuId}
+          AND lock_stock &gt;= #{quantity}
+    </update>
+
+    <!-- 返还优惠券：只返还绑定在当前订单上的已使用记录，并清理订单绑定，避免退错其他订单的优惠券 -->
+    <update id="returnCoupon">
+        UPDATE sms_coupon_history
+        SET use_status = 0,
+            use_time   = NULL,
+            order_id   = NULL,
+            order_sn   = NULL
+        WHERE order_id = #{orderId}
+          AND member_id = #{memberId}
+          AND use_status = 1
+    </update>
+
+    <!-- 返还订单使用积分 -->
+    <update id="refundIntegration">
+        UPDATE ums_member
+        SET integration = COALESCE(integration, 0) + #{integration}
+        WHERE id = #{memberId}
+    </update>
+
     <select id="getDetail" resultMap="orderDetailResultMap">
         SELECT o.*,
             oi.id item_id,

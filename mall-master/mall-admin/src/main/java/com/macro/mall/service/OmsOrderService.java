@@ -22,9 +22,11 @@ public interface OmsOrderService {
     int delivery(List<OmsOrderDeliveryParam> deliveryParamList);
 
     /**
-     * 批量关闭订单
+     * 批量关闭订单。
+     * <p>
+     * 不使用接口级事务：方法内部按订单逐个开启独立事务，单个订单补偿失败只回滚该订单，
+     * 失败订单会在方法末尾统一抛出，不会被计入成功数量。
      */
-    @Transactional
     int close(List<Long> ids, String note);
 
     /**

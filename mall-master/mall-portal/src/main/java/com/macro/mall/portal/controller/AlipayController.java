@@ -61,7 +61,10 @@ public class AlipayController {
         return alipayService.notify(params);
     }
 
-    @Operation(summary = "支付宝统一收单线下交易查询",description = "订单支付成功返回交易状态：TRADE_SUCCESS")
+    @Operation(summary = "支付宝统一收单线下交易查询",
+            description = "只有本地订单也真正支付成功（订单归属校验通过、支付宝金额与订单应付金额一致、本地支付成功逻辑返回成功或幂等成功）时才返回 TRADE_SUCCESS；"
+                    + "本地校验失败返回 PAYMENT_VERIFY_FAILED，本地支付处理失败返回 PAYMENT_PROCESS_FAILED，"
+                    + "支付宝返回其它交易状态（WAIT_BUYER_PAY / TRADE_CLOSED / TRADE_FINISHED）时原样返回，查询失败返回 null")
     @RequestMapping(value = "/query", method = RequestMethod.GET)
     @ResponseBody
     public CommonResult<String> query(String outTradeNo, String tradeNo){
