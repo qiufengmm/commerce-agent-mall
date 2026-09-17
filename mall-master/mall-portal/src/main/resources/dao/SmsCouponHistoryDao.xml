@@ -50,4 +50,36 @@
             AND NOW() > c.end_time
         </if>
     </select>
+
+    <!-- 占用优惠券：仅未使用记录可被占用，并绑定到当前订单；影响行数为 0 表示优惠券不可用或已被占用 -->
+    <update id="useCoupon">
+        UPDATE sms_coupon_history
+        SET use_status = 1,
+            use_time   = NOW(),
+            order_id   = #{orderId},
+            order_sn   = #{orderSn}
+        WHERE id = (
+            SELECT id FROM (
+                SELECT id
+                FROM sms_coupon_history
+                WHERE member_id = #{memberId}
+                  AND coupon_id = #{couponId}
+                  AND use_status = 0
+                ORDER BY id
+                LIMIT 1
+            ) couponCandidate
+        )
+    </update>
+
+    <!-- 返还优惠券：只返还绑定在当前订单上的已使用记录，并清理订单绑定，重复返还不会重复命中 -->
+    <update id="returnCoupon">
+        UPDATE sms_coupon_history
+        SET use_status = 0,
+            use_time   = NULL,
+            order_id   = NULL,
+            order_sn   = NULL
+        WHERE order_id = #{orderId}
+          AND member_id = #{memberId}
+          AND use_status = 1
+    </update>
 </mapper>

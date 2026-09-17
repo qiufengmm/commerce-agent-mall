@@ -8,6 +8,7 @@ import com.macro.mall.model.UmsMember;
 import com.macro.mall.model.UmsMemberExample;
 import com.macro.mall.model.UmsMemberLevel;
 import com.macro.mall.model.UmsMemberLevelExample;
+import com.macro.mall.portal.dao.PortalMemberDao;
 import com.macro.mall.portal.domain.MemberDetails;
 import com.macro.mall.portal.service.UmsMemberCacheService;
 import com.macro.mall.portal.service.UmsMemberService;
@@ -48,6 +49,8 @@ public class UmsMemberServiceImpl implements UmsMemberService {
     private UmsMemberLevelMapper memberLevelMapper;
     @Autowired
     private UmsMemberCacheService memberCacheService;
+    @Autowired
+    private PortalMemberDao portalMemberDao;
     @Value("${redis.key.authCode}")
     private String REDIS_KEY_PREFIX_AUTH_CODE;
     @Value("${redis.expire.authCode}")
@@ -149,6 +152,27 @@ public class UmsMemberServiceImpl implements UmsMemberService {
         record.setIntegration(integration);
         memberMapper.updateByPrimaryKeySelective(record);
         memberCacheService.delMember(id);
+    }
+
+    @Override
+    public boolean deductIntegration(Long id, Integer integration) {
+        if (id == null || integration == null || integration <= 0) {
+            return false;
+        }
+        //带积分下限条件的原子扣减，避免并发扣减导致积分丢失或变成负数
+        boolean success = portalMemberDao.deductIntegration(id, integration) == 1;
+        memberCacheService.delMember(id);
+        return success;
+    }
+
+    @Override
+    public boolean refundIntegration(Long id, Integer integration) {
+        if (id == null || integration == null || integration <= 0) {
+            return false;
+        }
+        boolean success = portalMemberDao.refundIntegration(id, integration) == 1;
+        memberCacheService.delMember(id);
+        return success;
     }
 
     @Override

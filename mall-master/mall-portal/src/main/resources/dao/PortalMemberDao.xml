@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.portal.dao.PortalMemberDao">
+    <!-- 扣减积分：积分充足才执行，避免并发扣减导致积分变成负数 -->
+    <update id="deductIntegration">
+        UPDATE ums_member
+        SET integration = COALESCE(integration, 0) - #{integration}
+        WHERE id = #{memberId}
+          AND COALESCE(integration, 0) &gt;= #{integration}
+    </update>
+
+    <!-- 返还积分 -->
+    <update id="refundIntegration">
+        UPDATE ums_member
+        SET integration = COALESCE(integration, 0) + #{integration}
+        WHERE id = #{memberId}
+    </update>
+</mapper>

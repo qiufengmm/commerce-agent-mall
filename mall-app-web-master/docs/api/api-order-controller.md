@@ -12,7 +12,7 @@
 
 | #   | 方法 | 路径                          | 说明                       |
 | --- | ---- | ----------------------------- | -------------------------- |
-| 1   | POST | `/order/cancelOrder`          | 取消单个超时订单           |
+| 1   | POST | ~~`/order/cancelOrder`~~      | 已移除（越权风险，见下方说明） |
 | 2   | POST | `/order/cancelTimeOutOrder`   | 自动取消超时订单           |
 | 3   | POST | `/order/cancelUserOrder`      | 用户取消订单               |
 | 4   | POST | `/order/confirmReceiveOrder`  | 用户确认收货               |
@@ -25,21 +25,13 @@
 
 ---
 
-## 1. 取消单个超时订单
+## 1. 取消单个超时订单（已移除）
 
-**POST** `/order/cancelOrder`
+**POST** `/order/cancelOrder` — 接口已下线，请勿再调用。
 
-### 请求参数
-
-Query 参数：
-
-| 参数名  | 类型           | 必填 | 说明    |
-| ------- | -------------- | ---- | ------- |
-| orderId | number (int64) | 否   | 订单 ID |
-
-### 响应结果
-
-`CommonResult<object>` — 见 [通用模型](./api-common-models.md#commonresultt)，data 为空对象
+该接口允许客户端传入任意 `orderId` 并把订单塞进延迟取消队列，会员可以猜测并取消他人待付款订单，存在越权风险。
+超时取消能力保留在系统内部：下单成功后由服务端自行发送延迟消息，`CancelOrderReceiver` 仍会调用系统级取消逻辑。
+会员取消自己的订单请改用 `/order/cancelUserOrder`，该接口会校验订单归属与订单状态。
 
 ---
 

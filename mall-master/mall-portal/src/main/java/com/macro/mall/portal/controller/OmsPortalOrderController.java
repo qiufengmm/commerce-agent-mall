@@ -5,6 +5,7 @@ import com.macro.mall.common.api.CommonResult;
 import com.macro.mall.portal.domain.ConfirmOrderResult;
 import com.macro.mall.portal.domain.DirectBuyParam;
 import com.macro.mall.portal.domain.OmsOrderDetail;
+import com.macro.mall.portal.domain.OrderOperationResult;
 import com.macro.mall.portal.domain.OrderParam;
 import com.macro.mall.portal.service.OmsPortalOrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,8 +58,8 @@ public class OmsPortalOrderController {
     @RequestMapping(value = "/paySuccess", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult paySuccess(@RequestParam Long orderId,@RequestParam Integer payType) {
-        Integer count = portalOrderService.paySuccess(orderId,payType);
-        return CommonResult.success(count, "支付成功");
+        OrderOperationResult result = portalOrderService.paySuccess(orderId,payType);
+        return toCommonResult(result, "支付成功", "订单不存在或无权支付", "订单当前状态不允许支付，或支付方式不合法");
     }
 
     @Operation(summary = "自动取消超时订单")
@@ -66,14 +67,6 @@ public class OmsPortalOrderController {
     @ResponseBody
     public CommonResult cancelTimeOutOrder() {
         portalOrderService.cancelTimeOutOrder();
-        return CommonResult.success(null);
-    }
-
-    @Operation(summary = "取消单个超时订单")
-    @RequestMapping(value = "/cancelOrder", method = RequestMethod.POST)
-    @ResponseBody
-    public CommonResult cancelOrder(Long orderId) {
-        portalOrderService.sendDelayMessageCancelOrder(orderId);
         return CommonResult.success(null);
     }
 
@@ -101,16 +94,16 @@ public class OmsPortalOrderController {
     @RequestMapping(value = "/cancelUserOrder", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult cancelUserOrder(Long orderId) {
-        portalOrderService.cancelOrder(orderId);
-        return CommonResult.success(null);
+        OrderOperationResult result = portalOrderService.cancelMemberOrder(orderId);
+        return toCommonResult(result, "取消成功", "订单不存在或无权取消", "订单当前状态不允许取消");
     }
 
     @Operation(summary = "用户确认收货")
     @RequestMapping(value = "/confirmReceiveOrder", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult confirmReceiveOrder(Long orderId) {
-        portalOrderService.confirmReceiveOrder(orderId);
-        return CommonResult.success(null);
+        OrderOperationResult result = portalOrderService.confirmReceiveOrder(orderId);
+        return toCommonResult(result, "确认收货成功", "订单不存在或无权操作", "订单当前状态不允许确认收货");
     }
 
     @Operation(summary = "用户删除订单")
@@ -119,5 +112,21 @@ public class OmsPortalOrderController {
     public CommonResult deleteOrder(Long orderId) {
         portalOrderService.deleteOrder(orderId);
         return CommonResult.success(null);
+    }
+
+    /**
+     * 把服务层的统一业务结果映射为接口响应，幂等结果与首次成功同样返回成功
+     */
+    private CommonResult toCommonResult(OrderOperationResult result, String successMessage, String notFoundMessage, String rejectedMessage) {
+        if (result == OrderOperationResult.SUCCESS) {
+            return CommonResult.success(null, successMessage);
+        }
+        if (result == OrderOperationResult.IDEMPOTENT) {
+            return CommonResult.success(null, "订单已处理，无需重复操作");
+        }
+        if (result == OrderOperationResult.NOT_FOUND) {
+            return CommonResult.failed(notFoundMessage);
+        }
+        return CommonResult.failed(rejectedMessage);
     }
 }
