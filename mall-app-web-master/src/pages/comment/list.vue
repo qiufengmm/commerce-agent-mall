@@ -12,8 +12,13 @@
       </view>
     </view>
 
+    <!-- 商品信息缺失 -->
+    <view v-if="productMissing" class="empty">
+      <text class="empty-text">商品信息缺失，请返回商品详情页重试</text>
+    </view>
+
     <!-- 空状态 -->
-    <view v-if="!loading && commentList.length === 0" class="empty">
+    <view v-else-if="!loading && commentList.length === 0" class="empty">
       <text class="empty-text">还没有人评价，快来抢首评</text>
     </view>
 
@@ -61,26 +66,38 @@ import { ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getCommentListAPI } from '@/apis/comment'
 import type { PmsComment } from '@/types/comment'
+import { useCommentPaging } from '@/composables/useCommentPaging'
 
 // ===== 页面数据 =====
 // 商品id
 const productId = ref(0)
-// 评价总数
-const total = ref(0)
-// 评价列表
-const commentList = ref<PmsComment[]>([])
-// 当前页码
-const pageNum = ref(1)
-// 每页数量
-const pageSize = ref(10)
-// 是否首次加载中
-const loading = ref(true)
-// 加载更多状态
-const loadingType = ref<'more' | 'loading' | 'nomore'>('more')
-// 是否有请求正在执行，用于防止并发请求
-const requesting = ref(false)
-// 请求序号，用于丢弃过期响应
-let requestSeq = 0
+// 商品信息是否缺失
+const productMissing = ref(false)
+
+// 分页状态与并发保护统一交给控制器处理，页面只负责传参与渲染
+const {
+  list: commentList,
+  total,
+  loading,
+  loadingType,
+  load: loadData,
+} = useCommentPaging<PmsComment>({
+  pageSize: 10,
+  // 商品id缺失时不发起请求
+  canLoad: () => !!productId.value,
+  fetcher: async ({ pageNum, pageSize }) => {
+    const res = await getCommentListAPI({ productId: productId.value, pageNum, pageSize })
+    return { list: res.data.list || [], total: res.data.total || 0 }
+  },
+  // 下拉刷新动画必须在成功、失败和提前返回时都结束
+  // 只有最新的 refresh 请求才能结束动画，避免被抢占的旧请求提前关闭最新一次刷新
+  onFinish: (type, isLatest) => {
+    if (type === 'refresh' && isLatest) {
+      uni.stopPullDownRefresh()
+    }
+  },
+  onError: (error) => console.error('加载商品评价失败', error),
+})
 
 // ===== 格式化方法 =====
 // 格式化星级展示
@@ -121,71 +138,11 @@ const formatDateTime = (time?: string): string => {
   )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-// ===== 数据加载 =====
-// 加载评价列表，type: refresh-下拉刷新 add-上拉加载
-const loadData = async (type: 'refresh' | 'add' = 'add') => {
-  const stopRefresh = () => {
-    if (type === 'refresh') {
-      uni.stopPullDownRefresh()
-    }
-  }
-
-  if (!productId.value) {
-    // 商品id缺失时也要结束下拉刷新动画，避免一直转圈
-    stopRefresh()
-    return
-  }
-  // 已有请求在执行，直接忽略本次触发，避免并发请求导致重复或乱序
-  if (requesting.value) {
-    stopRefresh()
-    return
-  }
-  if (type === 'add' && loadingType.value === 'nomore') return
-
-  // 本次请求要查询的页码：刷新固定查第一页，加载更多沿用当前页码
-  const currentPage = type === 'refresh' ? 1 : pageNum.value
-  const currentSeq = ++requestSeq
-
-  requesting.value = true
-  loadingType.value = 'loading'
-
-  try {
-    const res = await getCommentListAPI({
-      productId: productId.value,
-      pageNum: currentPage,
-      pageSize: pageSize.value,
-    })
-    // 期间已发起过新的请求，丢弃本次过期响应
-    if (currentSeq !== requestSeq) return
-
-    const dataList = res.data.list || []
-    total.value = res.data.total || 0
-
-    // 刷新成功后替换数据，加载更多成功后追加数据
-    commentList.value = type === 'refresh' ? dataList : commentList.value.concat(dataList)
-    // 页码只在请求成功后推进，失败时不跳过页码
-    pageNum.value = currentPage + 1
-    loadingType.value = dataList.length < pageSize.value ? 'nomore' : 'more'
-  } catch (error) {
-    console.error('加载商品评价失败', error)
-    if (currentSeq !== requestSeq) return
-    // 失败后保持页码不变，允许再次触底重新请求同一页
-    loadingType.value = 'more'
-  } finally {
-    if (currentSeq === requestSeq) {
-      requesting.value = false
-      loading.value = false
-    }
-    if (type === 'refresh') {
-      uni.stopPullDownRefresh()
-    }
-  }
-}
-
 // ===== onLoad =====
 onLoad((options) => {
   productId.value = options?.productId ? Number(options.productId) : 0
   if (!productId.value) {
+    productMissing.value = true
     loading.value = false
     uni.showToast({ title: '商品信息缺失', icon: 'none' })
     return
