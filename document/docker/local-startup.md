@@ -131,8 +131,8 @@ docker compose --profile edge up -d
 | RabbitMQ | `rabbitmq:3.13-management-alpine` |
 | MongoDB | `mongo:7` |
 | Elasticsearch | `docker.elastic.co/elasticsearch/elasticsearch:8.18.8` |
-| MinIO | `minio/minio:RELEASE.2025-04-22T22-12-26Z` |
-| MinIO 初始化 | `minio/mc:RELEASE.2025-05-21T01-59-54Z` |
+| MinIO | `quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z` |
+| MinIO 初始化 | `quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z` |
 | 应用构建期 | `maven:3.9-eclipse-temurin-17`（固定，不支持覆盖） |
 | 应用运行期 | `eclipse-temurin:17-jre`（固定，不支持覆盖） |
 | Nginx | `nginx:1.27-alpine` |
@@ -141,9 +141,10 @@ docker compose --profile edge up -d
 
 ### 2.1 镜像标签拉取验证状态
 
-- `minio/minio` 与 `minio/mc` 的标签来自 GitHub Release 列表（本机 GitHub API 可达），
-  已确认为真实存在的发布标签，**互相兼容**（同为 2025 年二季度发布）。
-- **但本机 Docker Hub 不可达，这两个标签尚未在本机完成拉取验证**；
+- MinIO 服务与初始化客户端统一从官方 Quay 仓库拉取：`quay.io/minio/minio` 与
+  `quay.io/minio/mc`；固定标签来自同一时期的 GitHub Release，**互相兼容**。
+- 不再依赖 Docker Hub 上的 `minio/minio` 与 `minio/mc` 仓库；
+  如果当前网络无法访问 Quay，请按本节的镜像加速器或离线导入方案处理。
   同样未在本机验证的还有 MySQL / Redis / RabbitMQ / MongoDB / Nginx 等 Docker Hub 镜像。
 - `docker.elastic.co` 域名的镜像同样**未在本机完成拉取验证**。
 - 因此本文档不声称任何容器已经运行成功；实际拉取结果以你的网络环境为准。
@@ -214,8 +215,9 @@ LOGSTASH_IMAGE=mirror.example.com/logstash/logstash:8.18.3
 
 ```powershell
 # 联网机器
-docker pull minio/minio:RELEASE.2025-04-22T22-12-26Z
-docker save minio/minio:RELEASE.2025-04-22T22-12-26Z -o minio.tar
+docker pull quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+docker pull quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z
+docker save quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z -o minio.tar
 
 # 本机
 docker image load -i minio.tar

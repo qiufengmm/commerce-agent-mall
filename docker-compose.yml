@@ -172,7 +172,7 @@ services:
   # infra：MinIO（默认启动）
   # ---------------------------------------------------------------------------
   minio:
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z}
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请设置 MINIO_ROOT_USER}
@@ -201,7 +201,7 @@ services:
   # 只创建 bucket 并设置为「匿名只读下载」（mc anonymous set download），
   # 不开放匿名上传 / 删除 / 写入权限（不使用 upload、public）。
   minio-init:
-    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-05-21T01-59-54Z}
+    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |

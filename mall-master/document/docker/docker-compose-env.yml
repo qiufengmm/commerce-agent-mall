@@ -86,7 +86,7 @@ services:
     ports:
       - 27017:27017
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: minio
     command: server /data --console-address ":9001" #指定数据目录及console运行端口启动
     volumes:
