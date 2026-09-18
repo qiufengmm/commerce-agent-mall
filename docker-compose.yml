@@ -1,0 +1,488 @@
+# =============================================================================
+# Mall 本地全栈 Docker Compose 配置
+# =============================================================================
+# 运行模式：
+#   infra（默认分组，不需要 --profile） docker compose up -d
+#   + Java 应用                        docker compose --profile app up -d
+#   + Nginx 边缘代理                   docker compose --profile edge up -d
+#   + Logstash / Kibana                docker compose --profile observability up -d
+#   全栈                               docker compose --profile app --profile edge --profile observability up -d
+#
+# 约定：
+# 1. 只使用命名 volume，不使用 /mydata/... 这类宿主机绝对路径。
+# 2. 不设置 container_name，不使用 links / external_links。
+# 3. 所有凭据来自 .env，仓库内只有 .env.example 的占位符。
+# 4. 不修改业务数据库表结构与现有 API，应用连接信息全部通过环境变量覆盖。
+# 5. 镜像标签统一支持通过环境变量覆盖，便于在受限网络中替换。
+# 6. 默认所有发布端口只绑定 127.0.0.1，不暴露到局域网。
+#    只有 MinIO 与 Nginx 提供按服务 opt-in 的绑定地址变量
+#    （MINIO_BIND_ADDR / NGINX_BIND_ADDR），用于手机 / 微信开发者工具联调；
+#    不存在能把 Redis、MongoDB、ES 等无认证基础设施整体暴露到 0.0.0.0 的开关。
+# 7. 启动前必须先执行凭据校验脚本：document/docker/check-env.ps1
+# 8. 启动顺序：minio-init 是 bucket 与匿名只读策略的唯一负责方，
+#    mall-admin 通过 depends_on 等待其「成功退出」（service_completed_successfully）；
+#    minio-init 失败会阻止 mall-admin 启动。
+#
+# 详细启动与排查步骤见 document/docker/local-startup.md
+# =============================================================================
+
+name: mall-local
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # infra：MySQL（默认启动）
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:5.7}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mall}
+      TZ: Asia/Shanghai
+    # 默认只绑定回环地址
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 数据库初始化 SQL 默认不挂载：mall.sql 含 DROP TABLE / CREATE TABLE /
+      # 初始化数据，只在「新建的空数据卷」首次启动时才会自动执行，误用会丢数据。
+      # 确认要初始化一个全新的本地库时，才取消下面一行的注释：
+      # - ./mall-master/document/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # 注意：Compose 中引用容器环境变量需要写成 $$VAR，否则会在 config 阶段被本地插值
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" -e \"SELECT 1\" > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：Redis（默认启动）
+  # ---------------------------------------------------------------------------
+  # 本地开发无认证，因此只绑定 127.0.0.1，不允许通过变量整体暴露到局域网。
+  redis:
+    image: ${REDIS_IMAGE:-redis:7}
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：RabbitMQ（默认启动）
+  # ---------------------------------------------------------------------------
+  # RABBITMQ_DEFAULT_* 由官方镜像自动创建 vhost、用户并授予权限，
+  # 不需要额外的 init 容器执行 rabbitmqctl。
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management-alpine}
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?请设置 RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/mall}
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：MongoDB（默认启动，mall-portal 浏览历史 / 收藏 / 关注）
+  # ---------------------------------------------------------------------------
+  # 本地开发无认证，因此只绑定 127.0.0.1。
+  mongo:
+    image: ${MONGO_IMAGE:-mongo:7}
+    command: ["mongod", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping')\" > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：Elasticsearch 单节点（默认启动）
+  # ---------------------------------------------------------------------------
+  # 版本 8.18.8，与本地 Maven 依赖 co.elastic.clients:elasticsearch-java:8.18.8
+  # 对齐；不使用历史配置中的 7.17.3。
+  # 本地开发关闭 xpack 安全认证，因此只绑定 127.0.0.1。
+  elasticsearch:
+    image: ${ES_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch:8.18.8}
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms1g -Xmx1g}
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      xpack.ml.enabled: "false"
+      ingest.geoip.downloader.enabled: "false"
+      TZ: Asia/Shanghai
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "127.0.0.1:${ES_PORT:-9200}:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：MinIO（默认启动）
+  # ---------------------------------------------------------------------------
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请设置 MINIO_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      # MINIO_BIND_ADDR 是唯一允许改成 0.0.0.0 的按服务 opt-in 变量，
+      # 仅在需要手机 / 微信开发者工具联调时使用；默认 127.0.0.1。
+      - "${MINIO_BIND_ADDR:-127.0.0.1}:${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_BIND_ADDR:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # infra：MinIO bucket 初始化（一次性任务）
+  # ---------------------------------------------------------------------------
+  # 只创建 bucket 并设置为「匿名只读下载」（mc anonymous set download），
+  # 不开放匿名上传 / 删除 / 写入权限（不使用 upload、public）。
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-05-21T01-59-54Z}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set mallminio http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" > /dev/null
+        mc mb --ignore-existing "mallminio/$$MINIO_BUCKET_NAME"
+        # 设置为匿名只读下载（等价于只允许 s3:GetObject），
+        # 不开放匿名写入，上传与删除仍需要 root 凭据。
+        mc anonymous set download "mallminio/$$MINIO_BUCKET_NAME" > /dev/null
+        echo "MinIO bucket ready (anonymous download only): $$MINIO_BUCKET_NAME"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-mall}
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - mall-net
+    restart: "no"
+
+  # ===========================================================================
+  # app profile：Java 应用（使用本地源码多阶段构建）
+  # ===========================================================================
+  # mall-search 监听 8081；mall-admin（8080）与 mall-portal（8085）都依赖
+  # mall-search 健康后才启动，且不反向依赖，因此不存在循环依赖。
+  # mall-admin 额外依赖 minio-init 成功退出（service_completed_successfully）：
+  # minio-init 只依赖 minio，minio 不依赖任何服务，因此新增该边不会形成环。
+  mall-admin:
+    profiles: ["app"]
+    image: ${APP_IMAGE_PREFIX:-mall-local}/mall-admin:local
+    build:
+      context: .
+      dockerfile: document/docker/Dockerfile.app
+      args:
+        MODULE: mall-admin
+        JAR_FILE: mall-admin-1.0-SNAPSHOT.jar
+        APP_PORT: "8080"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+      # 显式声明监听端口，避免依赖模块默认配置
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-mall}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_ROOT_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      SPRING_DATASOURCE_DRUID_MAX_WAIT: "10000"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESSKEY: ${MINIO_ROOT_USER:?请设置 MINIO_ROOT_USER}
+      MINIO_SECRETKEY: ${MINIO_ROOT_PASSWORD:?请设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKETNAME: ${MINIO_BUCKET_NAME:-mall}
+      # 浏览器 / 手机可访问的公开地址，仅用于拼接返回给前端的 URL，
+      # 不作为 SDK 连接地址（SDK 仍使用上面的 MINIO_ENDPOINT）。
+      # 必须填写可被浏览器解析的地址，不要写成 Docker 服务名 http://minio:9000。
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MALL_SEARCH_BASE_URL: http://mall-search:8081
+      MALL_SEARCH_INTERNAL_TOKEN: ${MALL_SEARCH_INTERNAL_TOKEN:?请设置 MALL_SEARCH_INTERNAL_TOKEN}
+      LOGSTASH_HOST: ${LOGSTASH_HOST:-logstash}
+      LOGSTASH_ENABLEINNERLOG: ${LOGSTASH_ENABLEINNERLOG:-false}
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8080}:8080"
+    depends_on:
+      mall-search:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # minio 健康只代表 MinIO 服务可连通（SDK 需要能连上）；
+      # 上层的 minio-init 才是 bucket 与匿名只读策略的负责方，
+      # 因此这里必须等到 minio-init 「成功退出」后才允许应用启动：
+      # 若 minio-init 失败（退出码非 0），mall-admin 不会被创建，避免
+      # 应用在 bucket 不存在或匿名只读策略未生效时接受上传。
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  mall-search:
+    profiles: ["app"]
+    image: ${APP_IMAGE_PREFIX:-mall-local}/mall-search:local
+    build:
+      context: .
+      dockerfile: document/docker/Dockerfile.app
+      args:
+        MODULE: mall-search
+        JAR_FILE: mall-search-1.0-SNAPSHOT.jar
+        APP_PORT: "8081"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+      SERVER_PORT: "8081"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-mall}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_ROOT_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      SPRING_DATASOURCE_DRUID_MAX_WAIT: "10000"
+      # application-dev.yml 中的字面值会被这里的环境变量覆盖（环境变量优先级最高）
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_DATA_ELASTICSEARCH_REPOSITORIES_ENABLED: "true"
+      MALL_SEARCH_INTERNAL_TOKEN: ${MALL_SEARCH_INTERNAL_TOKEN:?请设置 MALL_SEARCH_INTERNAL_TOKEN}
+      LOGSTASH_HOST: ${LOGSTASH_HOST:-logstash}
+      LOGSTASH_ENABLEINNERLOG: ${LOGSTASH_ENABLEINNERLOG:-false}
+    ports:
+      - "127.0.0.1:${SEARCH_PORT:-8081}:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  mall-portal:
+    profiles: ["app"]
+    image: ${APP_IMAGE_PREFIX:-mall-local}/mall-portal:local
+    build:
+      context: .
+      dockerfile: document/docker/Dockerfile.app
+      args:
+        MODULE: mall-portal
+        JAR_FILE: mall-portal-1.0-SNAPSHOT.jar
+        APP_PORT: "8085"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+      # mall-portal/src/main/resources/application.yml 未声明 server.port，
+      # 且本工作树不含 application-dev.yml，因此必须显式声明 8085
+      SERVER_PORT: "8085"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-mall}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_ROOT_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      SPRING_DATASOURCE_DRUID_MAX_WAIT: "10000"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_MONGODB_HOST: mongo
+      SPRING_DATA_MONGODB_PORT: "27017"
+      SPRING_DATA_MONGODB_DATABASE: ${MONGO_DATABASE:-mall-port}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/mall}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?请设置 RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
+      # 门户只调用 /esProduct/search，不需要内部同步令牌
+      MALL_SEARCH_BASE_URL: http://mall-search:8081
+      LOGSTASH_HOST: ${LOGSTASH_HOST:-logstash}
+      LOGSTASH_ENABLEINNERLOG: ${LOGSTASH_ENABLEINNERLOG:-false}
+    ports:
+      - "127.0.0.1:${PORTAL_PORT:-8085}:8085"
+    depends_on:
+      mall-search:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8085/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ===========================================================================
+  # edge profile：Nginx 边缘代理
+  # ===========================================================================
+  # 挂载已构建好的前端静态产物，并反向代理三个后端服务：
+  #   /admin-api/  -> mall-admin:8080
+  #   /portal-api/ -> mall-portal:8085
+  #   /es-api/     -> mall-search:8081
+  # 未构建前端产物时目录为空，页面会 404，构建命令见 document/docker/local-startup.md。
+  nginx:
+    profiles: ["edge"]
+    image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    ports:
+      # NGINX_BIND_ADDR 是另一个允许改成 0.0.0.0 的按服务 opt-in 变量，
+      # 仅在需要手机 / 微信开发者工具联调时使用；默认 127.0.0.1。
+      - "${NGINX_BIND_ADDR:-127.0.0.1}:${NGINX_HTTP_PORT:-8088}:80"
+    volumes:
+      - ./document/docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ${ADMIN_WEB_DIST_DIR:-./mall-admin-web-master/dist}:/usr/share/nginx/admin:ro
+      - ${H5_WEB_DIST_DIR:-./mall-app-web-master/dist/build/h5}:/usr/share/nginx/h5:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/ > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  # ===========================================================================
+  # observability profile：Logstash + Kibana
+  # ===========================================================================
+  # 不作为业务启动依赖，只在需要日志采集 / 检索时按需启动。
+  logstash:
+    profiles: ["observability"]
+    image: ${LOGSTASH_IMAGE:-docker.elastic.co/logstash/logstash:8.18.3}
+    environment:
+      TZ: Asia/Shanghai
+      LS_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:4560:4560"
+      - "127.0.0.1:4561:4561"
+      - "127.0.0.1:4562:4562"
+      - "127.0.0.1:4563:4563"
+    volumes:
+      - ./document/docker/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9600/_node/stats > /dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+  kibana:
+    profiles: ["observability"]
+    image: ${KIBANA_IMAGE:-docker.elastic.co/kibana/kibana:8.18.8}
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5601/api/status > /dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
+# =============================================================================
+# 网络与数据卷
+# =============================================================================
+networks:
+  mall-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  mongo-data:
+  es-data:
+  minio-data:

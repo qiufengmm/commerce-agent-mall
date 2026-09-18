@@ -30,6 +30,18 @@ public class MinioController {
     private static final Logger LOGGER = LoggerFactory.getLogger(MinioController.class);
     @Value("${minio.endpoint}")
     private String ENDPOINT;
+    /**
+     * 浏览器 / 手机可访问的公开地址（可选，默认空）。
+     * MinIO SDK 连接始终使用 ENDPOINT（容器网络内部地址），
+     * 只有返回给前端的 URL 使用该地址，二者可以不同。
+     * 未配置时回退到 ENDPOINT，兼容宿主机直接运行模式。
+     *
+     * 环境变量名说明：Spring Boot 宽松绑定会把 minio.publicEndpoint 折叠成
+     * MINIO_PUBLICENDPOINT，因此这里再显式兜底读取下划线风格 MINIO_PUBLIC_ENDPOINT，
+     * 两种写法都能生效（已用本地测试验证）。
+     */
+    @Value("${minio.publicEndpoint:${MINIO_PUBLIC_ENDPOINT:}}")
+    private String PUBLIC_ENDPOINT;
     @Value("${minio.bucketName}")
     private String BUCKET_NAME;
     @Value("${minio.accessKey}")
@@ -37,14 +49,81 @@ public class MinioController {
     @Value("${minio.secretKey}")
     private String SECRET_KEY;
 
+    /**
+     * MinIO SDK 连接地址：始终使用容器网络可达的内部地址，不受公开地址影响。
+     */
+    String sdkEndpoint() {
+        return ENDPOINT;
+    }
+
+    /**
+     * 返回给前端的访问地址：优先使用公开地址，未配置时回退到内部地址。
+     */
+    String publicEndpoint() {
+        return resolvePublicEndpoint(ENDPOINT, PUBLIC_ENDPOINT);
+    }
+
+    /**
+     * 解析对外访问地址：公开地址为空 / 空白时回退到内部地址。
+     */
+    static String resolvePublicEndpoint(String internalEndpoint, String publicEndpoint) {
+        if (publicEndpoint == null || publicEndpoint.trim().isEmpty()) {
+            return internalEndpoint;
+        }
+        return publicEndpoint.trim();
+    }
+
+    /**
+     * 拼接对象访问 URL，去掉各段首尾多余的斜杠，避免出现双斜杠。
+     */
+    static String buildObjectUrl(String baseEndpoint, String bucketName, String objectName) {
+        String base = trimTrailingSlash(baseEndpoint);
+        String bucket = trimSlashes(bucketName);
+        String object = trimLeadingSlash(objectName);
+        StringBuilder url = new StringBuilder(base);
+        if (!bucket.isEmpty()) {
+            if (url.length() > 0) {
+                url.append('/');
+            }
+            url.append(bucket);
+        }
+        if (!object.isEmpty()) {
+            if (url.length() > 0) {
+                url.append('/');
+            }
+            url.append(object);
+        }
+        return url.toString();
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
+    private static String trimLeadingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.startsWith("/")) {
+            result = result.substring(1);
+        }
+        return result;
+    }
+
+    private static String trimSlashes(String value) {
+        return trimLeadingSlash(trimTrailingSlash(value));
+    }
+
     @Operation(summary = "文件上传")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseBody
     public CommonResult upload(@RequestPart("file") MultipartFile file) {
         try {
-            //创建一个MinIO的Java客户端
+            //创建一个MinIO的Java客户端（内部地址，容器内可直接解析）
             MinioClient minioClient =MinioClient.builder()
-                    .endpoint(ENDPOINT)
+                    .endpoint(sdkEndpoint())
                     .credentials(ACCESS_KEY,SECRET_KEY)
                     .build();
             boolean isExist = minioClient.bucketExists(BucketExistsArgs.builder().bucket(BUCKET_NAME).build());
@@ -74,7 +153,8 @@ public class MinioController {
             LOGGER.info("文件上传成功!");
             MinioUploadDto minioUploadDto = new MinioUploadDto();
             minioUploadDto.setName(filename);
-            minioUploadDto.setUrl(ENDPOINT + "/" + BUCKET_NAME + "/" + objectName);
+            // 返回给前端的 URL 使用公开地址，避免浏览器拿到容器内部主机名
+            minioUploadDto.setUrl(buildObjectUrl(publicEndpoint(), BUCKET_NAME, objectName));
             return CommonResult.success(minioUploadDto);
         } catch (Exception e) {
             e.printStackTrace();

@@ -1,0 +1,36 @@
+# Docker 构建上下文忽略规则
+# 目的：docker-compose.yml 的应用构建上下文为仓库根目录，
+# 必须排除前端依赖、构建产物、版本库与本地环境文件，否则上下文体积过大，
+# 且可能把本地 .env 打进镜像层。
+
+# 依赖与构建产物
+**/node_modules/
+**/dist/
+**/target/
+**/build/
+**/.vite/
+
+# 版本库与 IDE
+.git/
+**/.idea/
+**/.vscode/
+
+# 本地环境与敏感配置
+**/.env
+**/.env.*
+!**/.env.example
+**/application-dev.yml
+**/application-prod.yml
+**/application-dev.yaml
+**/application-prod.yaml
+
+# 日志、缓存与本地协作产物
+**/*.log
+**/__pycache__/
+**/*.pyc
+.codebuddy/
+.codex/
+
+# 图片迁移的本地数据与导出文件
+imgmigrate/mirror/
+imgmigrate/output/
