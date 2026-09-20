@@ -103,6 +103,7 @@
 import { ref } from 'vue'
 import { onLoad, onPageScroll, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getCategoryTreeAPI, searchProductListAPI } from '@/apis/product'
+import { canStartSearchLoad, resolveSearchPageState, resolveSearchSort } from '@/utils/productSearch'
 import type { CategoryTreeNode, ProductListParam, PmsProduct } from '@/types/product'
 
 // ===== 常量 =====
@@ -147,8 +148,8 @@ const loadCateList = async () => {
 
 // 加载商品列表
 const loadData = async (type: 'refresh' | 'add' = 'add') => {
-  // 没有更多直接返回
-  if (type === 'add' && loadingType.value === 'nomore') {
+  // 没有更多直接返回：上拉加载被拦截，下拉刷新仍然允许
+  if (!canStartSearchLoad(type, loadingType.value)) {
     return
   }
 
@@ -165,28 +166,23 @@ const loadData = async (type: 'refresh' | 'add' = 'add') => {
   }
 
   // 设置排序参数
-  if (filterIndex.value === 0) {
-    searchParam.value.sort = 0
-  } else if (filterIndex.value === 1) {
-    searchParam.value.sort = 2
-  } else if (filterIndex.value === 2) {
-    searchParam.value.sort = priceOrder.value === 1 ? 3 : 4
-  }
+  searchParam.value.sort = resolveSearchSort({
+    filterIndex: filterIndex.value,
+    priceOrder: priceOrder.value,
+  })
 
   try {
     const res = await searchProductListAPI(searchParam.value)
     const list = res.data.list
 
-    if (list.length === 0) {
-      // 没有更多了
-      loadingType.value = 'nomore'
-      searchParam.value.pageNum--
-    } else if (list.length < searchParam.value.pageSize) {
-      loadingType.value = 'nomore'
-      searchParam.value.pageNum--
-    } else {
-      loadingType.value = 'more'
-    }
+    // 空结果或不满一页都视为没有更多，并回退页码
+    const pageState = resolveSearchPageState({
+      listLength: list.length,
+      pageSize: searchParam.value.pageSize,
+      pageNum: searchParam.value.pageNum,
+    })
+    loadingType.value = pageState.loadingType
+    searchParam.value.pageNum = pageState.nextPageNum
 
     // 追加或替换数据
     productList.value = productList.value.concat(list)
