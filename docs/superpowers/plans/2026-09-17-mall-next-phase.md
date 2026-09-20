@@ -66,7 +66,7 @@
 - [x] 经用户确认后逐个执行 `git worktree remove <明确路径>`，不批量删除。
 - [x] 保留分支历史，不删除远程分支。
 
-收尾记录：旧的评价与 Elasticsearch worktree 已完成清理；Docker 收尾 worktree `feature/minio-quay-images` 已合并至 `main`，保留分支历史，待本轮逐个移除其工作目录。
+收尾记录：旧的评价与 Elasticsearch worktree 已完成清理；Docker 收尾 worktree `feature/minio-quay-images` 已合并至 `main`，并已移除其工作目录，保留分支历史。后续核心测试 worktree 在合并后另行保留，待用户确认后再清理。
 
 ---
 
@@ -86,7 +86,7 @@
 
 ---
 
-### Task 5: 关键接口与端到端验证
+### Task 5: 关键接口与端到端验证（自动化测试完成，在线冒烟待执行）
 
 **Files:**
 - Tests remain beside existing modules under `mall-master/**/src/test/`。
@@ -98,12 +98,12 @@
 - 真实 Docker API 冒烟只允许使用当前本地环境中已存在的数据做只读验证；若需要新增/修改业务数据，必须先按 `AGENTS.md` 取得 SQL 执行确认，并优先使用隔离测试数据。
 - 当前基线：`mall-admin` 现有测试 49 个通过；`mall-search` 已执行 35 个测试，其中 3 个 Spring 上下文测试因开发 profile 默认数据源连接配置失败，不能据此宣称全套测试通过；`mall-portal` 因 Maven reactor 在 `mall-search` 失败后未执行。
 
-- [ ] 后端自动化覆盖注册、登录、直接购买、库存锁定、支付幂等、取消补偿、优惠券返还和评价接口。
-- [ ] ES 覆盖导入、搜索分页、商品变更同步、删除同步和鉴权失败。
-- [ ] 前端 Vitest 覆盖评价分页、购物车批量删除、搜索返回和支付结果显示。
+- [x] 后端自动化覆盖会员注册/登录、购物车、订单、评价等核心控制器与服务边界；新增 77 个 portal 用例，全部通过。
+- [x] ES 搜索分页和深分页边界已覆盖；新增 14 个 search 用例，全部通过。商品导入、同步和鉴权既有测试仍需结合在线环境清单继续核验。
+- [x] 前端 Vitest 覆盖商品搜索、支付结果和相关关键交互；7 个测试文件、43 个用例通过，TypeScript 检查通过。
 - [ ] 启动 Docker 基础设施后，按清单完成一次真实 API 冒烟；不得把测试数据写入生产库。
-- [ ] 记录基线失败和本轮失败，禁止用“测试通过”掩盖环境错误。
-- [ ] 独立提交：`补充核心交易链路测试`。
+- [x] 已记录基线失败和本轮失败，未用“测试通过”掩盖环境错误：`MallSearchApplicationTests` 3 个环境配置错误、`PortalProductDaoTests` 1 个 H2 表缺失错误，均为改动前基线。
+- [x] 独立提交：`085197b 补充核心接口与端到端测试`；已合并到 `main`，未 push。
 
 ---
 
@@ -138,8 +138,8 @@
 
 ## 当前执行顺序
 
-1. 更新交接/阶段计划并清理已合并 Docker worktree。
-2. 补核心接口与端到端测试。
+1. 用户确认后清理已合并的 `core-flow-tests` worktree。
+2. 按只读清单完成 Docker API 在线冒烟，并记录真实响应。
 3. 手机/微信真机图片联调。
 4. Elasticsearch 遗留项专项处理。
 5. 商品导购智能体设计与实现。
