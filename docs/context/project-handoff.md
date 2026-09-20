@@ -28,16 +28,17 @@
 - Nginx、三个 API 入口、MinIO 健康检查和 ES 检查均已返回成功；ES 集群为 green。
 - 三个 Java 应用镜像已成功构建。
 - Compose 默认配置和全 profile 配置校验均通过。
+- 2026-09-20 重新启动全 profile 后完成只读冒烟：Admin 实际宿主机端口为 `.env` 中的 `ADMIN_PORT=18080`，直连与 Nginx 代理均返回 200/UP；门户和 ES 搜索均返回 `code=200`、`pageNum=1`、5 条结果；ES `pms` 实时 `_count` 为 20；MinIO 健康检查和已知对象读取均返回 200。
+- 本次冒烟未执行 SQL、注册、下单、支付、同步/导入、上传或删除；历史对象是否完整仍需以实际对象清单为准。
 - 启动步骤和 SQL 安全边界见 `document/docker/local-startup.md`；历史 `mall.sql` 不作为已有数据库的直接覆盖脚本。
 
 ## 当前剩余任务
 
-1. 按 `document/testing/core-flow-checklist.md` 完成一次 Docker 环境只读 API 冒烟；自动化核心测试已完成，在线冒烟尚未在本轮测试任务中执行。
-2. 做 H5、微信开发者工具和局域网真机 MinIO 图片联调。
-3. 复评 Elasticsearch 遗留项：上下架事务边界、旧索引清理、同步接口保护和 MySQL 降级搜索。
-4. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
-5. 用户确认后清理已合并的 `core-flow-tests` worktree；保留功能分支历史。
-6. 测试和审查完成后，由用户确认是否 push 本地 `main`；未确认前不得 push。
+1. 做 H5、微信开发者工具和局域网真机 MinIO 图片联调。
+2. 复评 Elasticsearch 遗留项：上下架事务边界、旧索引清理、同步接口保护和 MySQL 降级搜索。
+3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
+4. 用户确认后清理已合并的 `core-flow-tests` worktree；保留功能分支历史。
+5. 测试和审查完成后，由用户确认是否 push 本地 `main`；未确认前不得 push。
 
 ## 新对话必须遵守
 

@@ -6,7 +6,7 @@
 ## 1. 前置条件
 
 1. Docker 环境已按 `document/docker/local-startup.md` 启动，基础设施 `Up (healthy)`；
-2. `mall-admin`(8080)、`mall-search`(8081)、`mall-portal`(8085) 三个应用已启动且健康检查通过；
+2. `mall-admin` 的宿主机端口由 `.env` 的 `ADMIN_PORT` 决定（`.env.example` 默认为 8080；本机可因端口冲突使用 18080），`mall-search` 为 8081、`mall-portal` 为 8085；三个应用均已启动且健康检查通过；
 3. 如经过 Nginx(8088)，`nginx` 容器也已启动；
 4. 本机已安装 `curl.exe`（Windows 10 1803+ 自带）与 Docker CLI。
 
@@ -32,7 +32,9 @@ docker compose --env-file .env ps
 ## 3. 服务健康检查
 
 ```powershell
-curl.exe http://localhost:8080/actuator/health
+# 从 Compose 实际映射读取 mall-admin 宿主机端口；避免把 .env 的 ADMIN_PORT 覆盖误判为失败
+$adminPort = (docker compose --env-file .env port mall-admin 8080).Split(':')[-1]
+curl.exe "http://localhost:$adminPort/actuator/health"
 curl.exe http://localhost:8085/actuator/health
 curl.exe http://localhost:8081/actuator/health
 ```
@@ -140,7 +142,7 @@ curl.exe -o $null -w "%{http_code}" "http://localhost:9000/mall/<桶内已知对
 后端（三个模块一起执行，包含已有测试与本次新增测试）：
 
 ```powershell
-Set-Location F:\code\mall\.worktrees\core-flow-tests\mall-master
+Set-Location F:\code\mall\mall-master
 mvn -pl mall-admin,mall-search,mall-portal -am test -DskipTests=false "-Dsurefire.failIfNoSpecifiedTests=false" "-Dmaven.test.failure.ignore=true"
 ```
 
@@ -161,7 +163,7 @@ mvn -pl mall-search test -DskipTests=false "-Dtest=EsProductControllerSearchTest
 前端：
 
 ```powershell
-Set-Location F:\code\mall\.worktrees\core-flow-tests\mall-app-web-master
+Set-Location F:\code\mall\mall-app-web-master
 npm test
 npm run tsc
 ```
