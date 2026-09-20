@@ -125,6 +125,6 @@ Expected: ten long-running services are healthy, `minio-init` is `Exited (0)`, a
 
 Run read-only checks for ES cluster health, `pms` count, bucket policy, and object count. Do not run `importAll`, SQL, upload, delete, or migration commands during this integration pass.
 
-- [ ] **Step 3: Commit and merge only after review**
+- [x] **Step 3: Commit and merge only after review**
 
 Create one Chinese commit containing the reviewed configuration/documentation changes, verify both the feature worktree and `main` are clean, fast-forward merge locally, and repeat the static and runtime checks on merged `main`.
