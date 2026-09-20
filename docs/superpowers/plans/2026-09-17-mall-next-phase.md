@@ -53,7 +53,7 @@
 
 ---
 
-### Task 3: 清理已完成 worktree
+### Task 3: 清理已完成 worktree（已完成）
 
 **Files:**
 - `F:\code\mall\.worktrees\comment-admin`
@@ -61,26 +61,28 @@
 - `F:\code\mall\.worktrees\es-search-admin`
 - `F:\code\mall\.worktrees\es-search-member`
 
-- [ ] 分别确认工作区无未提交改动且分支已包含在 `main`。
-- [ ] 保存提交哈希和报告路径。
-- [ ] 经用户确认后逐个执行 `git worktree remove <明确路径>`，不批量删除。
-- [ ] 保留分支历史，不删除远程分支。
+- [x] 分别确认已合并 worktree 无未提交改动且分支已包含在 `main`。
+- [x] 保存已合并提交哈希；历史任务报告按原 worktree 记录保留或随 worktree 清理，不作为当前代码基线。
+- [x] 经用户确认后逐个执行 `git worktree remove <明确路径>`，不批量删除。
+- [x] 保留分支历史，不删除远程分支。
+
+收尾记录：旧的评价与 Elasticsearch worktree 已完成清理；Docker 收尾 worktree `feature/minio-quay-images` 已合并至 `main`，保留分支历史，待本轮逐个移除其工作目录。
 
 ---
 
-### Task 4: Docker Compose 与启动文档
+### Task 4: Docker Compose 与启动文档（已完成）
 
 **Files:**
 - Create: `F:\code\mall\docker-compose.yml`
 - Create: `F:\code\mall\document\docker\local-startup.md`
 - Modify only when necessary: `mall-master/document/docker/`
 
-- [ ] 先盘点现有 Docker 文件、端口和环境变量，避免重复定义。
-- [ ] 编排 MySQL、Redis、RabbitMQ、Elasticsearch、MinIO；为数据目录配置持久化卷和健康检查。
-- [ ] 不把数据库密码、JWT 密钥、MinIO 密码写入仓库；使用 `.env.example` 占位符。
-- [ ] 文档写明启动顺序、初始化 SQL、RabbitMQ 用户/vhost、MinIO bucket、ES 索引导入和停止命令。
-- [ ] 使用 `docker compose config` 校验，逐服务启动并记录端口、健康状态和失败排查方法。
-- [ ] 该任务独立提交：`补充 Docker Compose 本地启动环境`。
+- [x] 盘点现有 Docker 文件、端口和环境变量，避免重复定义。
+- [x] 编排 MySQL、Redis、RabbitMQ、Elasticsearch、MinIO，并配置持久化卷和健康检查。
+- [x] 不把数据库密码、JWT 密钥、MinIO 密码写入仓库，使用 `.env.example` 占位符。
+- [x] 文档写明启动顺序、数据库快照边界、RabbitMQ 用户/vhost、MinIO bucket、ES 索引导入和停止命令。
+- [x] 使用 `docker compose config` 校验，并完成实际容器、HTTP、MinIO 和 ES 验证。
+- [x] 已完成提交：`aa9b1ba`、`c629448`、`ea338b7`、`32c06e6`。
 
 ---
 
@@ -130,9 +132,8 @@
 
 ## 当前执行顺序
 
-1. 清理已完成 worktree（需用户确认后逐个清理）。
-2. Docker Compose 与启动文档。
-3. 核心接口与端到端测试。
-4. 手机/微信真机图片联调。
-5. Elasticsearch 遗留项专项处理。
-6. 商品导购智能体设计与实现。
+1. 更新交接/阶段计划并清理已合并 Docker worktree。
+2. 补核心接口与端到端测试。
+3. 手机/微信真机图片联调。
+4. Elasticsearch 遗留项专项处理。
+5. 商品导购智能体设计与实现。
