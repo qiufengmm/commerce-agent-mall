@@ -3,6 +3,132 @@
 本文档说明如何用一套可重复使用的 Docker Compose 配置拉起 Mall 项目的全部本地依赖，
 以及各 profile 的启动、验证、停止与排查方式。
 
+## 按顺序操作清单（第一次启动请先执行这里）
+
+推荐第一次严格按以下顺序执行：进入仓库根目录 → 创建 `.env` → 校验配置 → 拉取镜像 → 启动基础设施 →（确认后）初始化数据库 → 构建 Java 应用 → 构建前端并启动 Nginx → 检查 MinIO bucket/匿名策略并导入 ES → 停止服务。
+
+全栈 `app + edge` 模式包含 10 个常驻服务，另有一次性 `minio-init`；后者成功状态是 `Exited (0)`，不是常驻 `healthy`。
+
+详细解释和故障排查见后续章节；本文档不会替你执行任何 SQL。
+
+### 1. 进入仓库根目录
+
+```powershell
+Set-Location F:\code\mall
+Test-Path .\docker-compose.yml
+docker info
+docker compose version
+```
+
+作用：确认当前目录确实是包含 `docker-compose.yml` 的仓库根目录，并确认 Docker Desktop 已启动。
+
+### 2. 创建并填写 `.env`
+
+```powershell
+if (-not (Test-Path -LiteralPath '.\.env')) {
+    Copy-Item -LiteralPath '.\.env.example' -Destination '.\.env'
+}
+notepad .env
+```
+
+作用：`.env.example` 只有占位值，`.env` 才是 Compose 实际读取的本机配置。至少替换 `MYSQL_ROOT_PASSWORD`、`RABBITMQ_PASSWORD`、`MINIO_ROOT_USER`、`MINIO_ROOT_PASSWORD` 和 `MALL_SEARCH_INTERNAL_TOKEN`。
+
+本机访问时保持：
+
+```ini
+MINIO_IMAGE=quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+MINIO_MC_IMAGE=quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z
+MINIO_PUBLIC_ENDPOINT=http://localhost:9000
+MINIO_BIND_ADDR=127.0.0.1
+NGINX_BIND_ADDR=127.0.0.1
+```
+
+作用：MinIO 服务和初始化客户端从 Quay 拉取；公开地址给浏览器使用；两个绑定地址确保默认只允许本机访问。
+
+### 3. 校验配置
+
+```powershell
+powershell -ExecutionPolicy Bypass -File document\docker\check-env.ps1
+if ($LASTEXITCODE -ne 0) { throw '凭据校验失败，请修改 .env 后重试' }
+docker compose --env-file .env config --quiet
+docker compose --env-file .env --profile app --profile edge --profile observability config --quiet
+docker compose --env-file .env config --images
+```
+
+作用：启动容器前发现占位密码、重复变量、YAML 错误和错误镜像地址。最后一条命令必须显示 `quay.io/minio/minio:...` 和 `quay.io/minio/mc:...`。
+
+### 4. 拉取镜像
+
+```powershell
+docker pull quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+docker pull quay.io/minio/mc:RELEASE.2025-05-21T01-59-54Z
+docker compose --env-file .env pull mysql redis rabbitmq mongo elasticsearch minio minio-init
+```
+
+作用：先区分镜像仓库/代理不可达和容器启动失败。MinIO 使用 Quay；如果 MySQL、Redis 等 Docker Hub 镜像失败，检查 Docker Desktop `Settings → Resources → Proxies`。
+
+### 5. 启动基础设施
+
+```powershell
+docker compose --env-file .env up -d
+docker compose --env-file .env ps -a
+docker compose --env-file .env logs --tail=100 minio-init
+```
+
+作用：启动 MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO，并运行一次性 `minio-init`。预期基础设施为 `Up (healthy)`，`minio-init` 为 `Exited (0)`。
+
+### 6. 初始化数据库前停下来确认
+
+要启动 Java 应用并访问真实商品数据，需要向全新的本地 MySQL 数据卷导入经过审查的数据库快照；只验证基础设施和 MinIO 可以跳过。仓库中的 `mall.sql` 是历史初始化脚本，包含建表、初始化数据以及可能影响已有表的语句，不能替代当前数据库快照，也不能导入已有业务库。执行任何 SQL 前必须确认影响范围，并在本对话明确回复：`确认执行这份 SQL`。本文档不会自动挂载或执行 SQL。
+
+### 7. 构建并启动 Java 应用
+
+```powershell
+docker compose --env-file .env --profile app build
+docker compose --env-file .env --profile app up -d
+docker compose --env-file .env --profile app ps -a
+```
+
+作用：构建并启动 `mall-search`、`mall-admin`、`mall-portal`。`mall-admin` 还会等待 `minio-init` 成功退出；失败时先看 `docker compose --env-file .env logs --tail=200 mall-search mall-admin mall-portal`。
+
+### 8. 构建前端并启动 Nginx
+
+```powershell
+Set-Location F:\code\mall\mall-admin-web-master
+npm install
+$env:VITE_BASE_SERVER_URL = '/admin-api'
+npm run build
+Set-Location F:\code\mall\mall-app-web-master
+npm install
+$env:VITE_API_BASE_URL = '/portal-api'
+npm run build:h5
+Set-Location F:\code\mall
+docker compose --env-file .env --profile app --profile edge up -d
+```
+
+作用：生成 Nginx 的前端静态文件并启动反向代理。管理后台地址是 `http://localhost:8088/`；只启动 `edge` 而没有启动 `app` 时 API 返回 502 是预期行为。
+
+### 9. 检查 MinIO bucket/匿名策略并导入 ES
+
+```powershell
+curl.exe http://localhost:9000/minio/health/live
+docker compose --env-file .env run --rm --no-deps minio-init `
+  'mc alias set localminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" > /dev/null && mc ls --recursive --json localminio/mall && mc anonymous get localminio/mall'
+curl.exe -X POST http://localhost:8081/esProduct/importAll
+curl.exe http://localhost:9200/_cat/indices?v
+curl.exe http://localhost:9200/pms/_count
+```
+
+作用：确认 MinIO 健康、`mall` bucket 存在且配置为匿名下载，并把 MySQL 在售商品导入 ES 的 `pms` 索引。该命令本身不上传文件；真实上传应在管理后台新增/编辑商品并上传图片，再用返回的匿名 URL 验证文件可以直接打开，URL 应以 `http://localhost:9000/mall/` 开头。
+
+### 10. 停止服务
+
+```powershell
+docker compose --env-file .env --profile app --profile edge --profile observability down
+```
+
+作用：删除容器和网络但保留命名数据卷。不要执行 `down -v`，除非明确要删除本地 MySQL、ES、MinIO 图片等全部数据。
+
 相关文件：
 
 ```text
@@ -18,11 +144,10 @@ document/docker/logstash/pipeline/logstash.conf  Logstash 管道配置
 
 > **当前交付边界（必读）**
 >
-> 本次返工**没有执行任何 SQL**，也**没有完成任何容器的实际运行验证**：
-> 本机 Docker Hub 不可达（`hub.docker.com` / `docker.io` / `index.docker.io` /
-> `auth.docker.io` 全部返回 `000`），镜像无法拉取，应用镜像无法构建。
-> 已完成的是配置级验证（`docker compose config`、端口绑定解析、凭据校验脚本），
-> 不要据此认为"容器已经跑通"。
+> 本文件是可复用的启动与排查说明，不记录某一台机器的动态容器状态、数据库行数或 MinIO 对象数量。
+> MinIO 的两个 Quay 镜像标签已在本地完成拉取验证；其他镜像是否能拉取，取决于目标机器的
+> Docker Desktop 网络与代理配置。执行完整运行验证必须按本文档顺序在目标机器实际启动，并以
+> `docker compose ps`、健康检查和 HTTP 检查结果为准。
 
 ---
 
@@ -145,9 +270,9 @@ docker compose --profile edge up -d
   `quay.io/minio/mc`；固定标签来自同一时期的 GitHub Release，**互相兼容**。
 - 不再依赖 Docker Hub 上的 `minio/minio` 与 `minio/mc` 仓库；
   如果当前网络无法访问 Quay，请按本节的镜像加速器或离线导入方案处理。
-  同样未在本机验证的还有 MySQL / Redis / RabbitMQ / MongoDB / Nginx 等 Docker Hub 镜像。
-- `docker.elastic.co` 域名的镜像同样**未在本机完成拉取验证**。
-- 因此本文档不声称任何容器已经运行成功；实际拉取结果以你的网络环境为准。
+  两个固定 Quay 标签已单独执行 `docker pull` 验证；其他 Docker Hub 和 `docker.elastic.co`
+  镜像仍需在你的网络环境中按第 4 节和第 5 节验证。
+- 因此本文档不把单独的镜像拉取成功等同于完整 Compose 已运行成功；实际结果以你的网络环境为准。
 
 ### 2.2 应用基础镜像的固定原则（不要改成 Alpine）
 
@@ -770,12 +895,11 @@ mc anonymous set download "mallminio/$MINIO_BUCKET_NAME"
 docker compose run --rm minio-init
 ```
 
-用 `mc` 检查：
+用 `mc` 检查（`docker compose run` 是临时容器，需先在该容器内创建 alias）：
 
 ```powershell
-docker compose run --rm minio-init mc ls mallminio
-docker compose run --rm minio-init mc stat mallminio/mall
-docker compose run --rm minio-init mc anonymous get mallminio/mall
+docker compose --env-file .env run --rm --no-deps minio-init `
+  'mc alias set localminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" > /dev/null && mc ls --recursive --json localminio/mall && mc stat localminio/mall && mc anonymous get localminio/mall'
 ```
 
 ### 9.4 上传后图片在浏览器打不开的排查
@@ -1019,12 +1143,8 @@ wsl -d docker-desktop sysctl -w vm.max_map_count=262144
 - `document/docker/Dockerfile.app` 中不含任何递归删除命令；
 - `git diff --check` 无空白错误。
 
-未完成（需要真实网络与运行时）：
-
-- **没有拉取任何镜像**，Docker Hub 与 `docker.elastic.co` 在本机均不可达；
-- **没有构建任何应用镜像**，因此没有验证 Maven 构建链路；
-- **没有启动任何容器**，健康检查、`depends_on` 顺序、Nginx 代理、ES 索引导入均未实测；
-- **没有执行任何 SQL**，数据库保持未初始化状态。
+动态验收边界：本文件不替代目标机器的运行报告。镜像拉取、应用构建、健康检查、`depends_on`
+顺序、Nginx 代理、ES 索引导入和数据库初始化，都必须在实际目标环境中按本文档逐项记录结果。
 
 ---
 

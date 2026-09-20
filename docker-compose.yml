@@ -412,7 +412,7 @@ services:
       - ${ADMIN_WEB_DIST_DIR:-./mall-admin-web-master/dist}:/usr/share/nginx/admin:ro
       - ${H5_WEB_DIST_DIR:-./mall-app-web-master/dist/build/h5}:/usr/share/nginx/h5:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost/ > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ > /dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

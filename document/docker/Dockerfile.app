@@ -33,7 +33,10 @@ COPY mall-master/ ./
 
 # -am 同时构建依赖模块（mall-common / mall-mbg / mall-security）
 # pom.xml 中已设置 skipTests=true，这里再次显式声明
-RUN mvn -B -ntp -pl "${MODULE}" -am -DskipTests package
+# -Ddocker.skip=true：mall-search/mall-admin/mall-portal 的 pom 绑定了 fabric8
+# docker-maven-plugin（写死连 192.168.3.101:2375 构建镜像），容器内构建必须跳过，
+# 外层 Dockerfile 已负责打镜像，该插件步骤冗余且必然失败。
+RUN mvn -B -ntp -pl "${MODULE}" -am -DskipTests -Ddocker.skip=true package
 
 # -----------------------------------------------------------------------------
 # 阶段二：Java 17 运行时（固定 Debian/Ubuntu 系镜像，必须可用 apt-get）
