@@ -92,6 +92,12 @@
 - Tests remain beside existing modules under `mall-master/**/src/test/`。
 - Manual checklist: `document/testing/core-flow-checklist.md`。
 
+**本轮测试边界：**
+
+- 后端新增测试默认使用 Mockito、standalone MockMvc 或 H2，不连接开发环境默认数据源，不把本机凭据复制到测试文件。
+- 真实 Docker API 冒烟只允许使用当前本地环境中已存在的数据做只读验证；若需要新增/修改业务数据，必须先按 `AGENTS.md` 取得 SQL 执行确认，并优先使用隔离测试数据。
+- 当前基线：`mall-admin` 现有测试 49 个通过；`mall-search` 已执行 35 个测试，其中 3 个 Spring 上下文测试因开发 profile 默认数据源连接配置失败，不能据此宣称全套测试通过；`mall-portal` 因 Maven reactor 在 `mall-search` 失败后未执行。
+
 - [ ] 后端自动化覆盖注册、登录、直接购买、库存锁定、支付幂等、取消补偿、优惠券返还和评价接口。
 - [ ] ES 覆盖导入、搜索分页、商品变更同步、删除同步和鉴权失败。
 - [ ] 前端 Vitest 覆盖评价分页、购物车批量删除、搜索返回和支付结果显示。
