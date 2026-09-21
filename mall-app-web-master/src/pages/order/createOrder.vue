@@ -29,7 +29,7 @@
       </view>
       <!-- 商品列表 -->
       <view class="g-item" v-for="item in cartPromotionItemList" :key="item.id">
-        <image :src="item.productPic"></image>
+        <image :src="resolveImageUrl(item.productPic)"></image>
         <view class="right">
           <text class="title clamp">{{ item.productName }}</text>
           <text class="spec">{{ formatProductAttr(item.productAttr) }}</text>
@@ -156,6 +156,7 @@ import type {
 } from '@/types/order'
 import type { SmsCoupon } from '@/types/coupon'
 import type { MemberReceiveAddress } from '@/types/address'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 优惠券面板显示状态

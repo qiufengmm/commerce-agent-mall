@@ -10,7 +10,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.brandLogo" mode="aspectFit"></image>
+          <image :src="resolveImageUrl(item.brandLogo)" mode="aspectFit"></image>
         </view>
         <view class="txt">
           <text class="title clamp">{{ item.brandName }}</text>
@@ -36,6 +36,7 @@ import { fetchBrandAttentionListAPI, clearBrandAttentionAPI } from '@/apis/membe
 import type { MemberBrandAttention } from '@/types/memberBrandAttention'
 import type { PageParam } from '@/types/common'
 import empty from '@/components/empty.vue'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 加载更多状态

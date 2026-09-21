@@ -13,7 +13,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.logo" mode="aspectFit"></image>
+          <image :src="resolveImageUrl(item.logo)" mode="aspectFit"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2">商品数量：{{ item.productCount }}</text>
@@ -32,6 +32,7 @@ import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getBrandRecommendListAPI } from '@/apis/brand'
 import type { PmsBrand } from '@/types/brand'
 import type { PageParam } from '@/types/common'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 加载更多状态

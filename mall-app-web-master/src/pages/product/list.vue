@@ -44,7 +44,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2">{{ item.subTitle }}</text>
@@ -104,6 +104,7 @@ import { ref } from 'vue'
 import { onLoad, onPageScroll, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getCategoryTreeAPI, searchProductListAPI } from '@/apis/product'
 import { canStartSearchLoad, resolveSearchPageState, resolveSearchSort } from '@/utils/productSearch'
+import { resolveImageUrl } from '@/utils/image'
 import type { CategoryTreeNode, ProductListParam, PmsProduct } from '@/types/product'
 
 // ===== 常量 =====

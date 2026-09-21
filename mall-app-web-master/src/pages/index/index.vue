@@ -22,7 +22,7 @@
           class="carousel-item"
           @click="handleNavToAdvertisePage(item)"
         >
-          <image :src="item.pic" mode="aspectFill" />
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill" />
         </swiper-item>
       </swiper>
       <!-- 自定义swiper指示器 -->
@@ -70,7 +70,7 @@
         @click="handleNavToBrandDetailPage(item)"
       >
         <view class="image-wrapper-brand">
-          <image :src="item.logo" mode="aspectFit"></image>
+          <image :src="resolveImageUrl(item.logo)" mode="aspectFit"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2">商品数量：{{ item.productCount }}</text>
@@ -103,7 +103,7 @@
         @click="handleNavToDetailPage(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2 clamp">{{ item.subTitle }}</text>
@@ -129,7 +129,7 @@
             class="floor-item"
             @click="handleNavToDetailPage(item)"
           >
-            <image :src="item.pic" mode="aspectFill"></image>
+            <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
             <text class="title clamp">{{ item.name }}</text>
             <text class="title2 clamp">{{ item.subTitle }}</text>
             <text class="price">￥{{ item.price }}</text>
@@ -156,7 +156,7 @@
         @click="handleNavToDetailPage(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
         </view>
         <view class="txt">
           <text class="title clamp">{{ item.name }}</text>
@@ -184,7 +184,7 @@
         @click="handleNavToDetailPage(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2 clamp">{{ item.subTitle }}</text>
@@ -210,6 +210,7 @@ import type { SmsHomeAdvertise, HomeFlashPromotion } from '@/types/home'
 import type { PmsProduct } from '@/types/product'
 import type { PmsBrand } from '@/types/brand'
 import type { PageParam } from '@/types/common'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 标题栏背景色

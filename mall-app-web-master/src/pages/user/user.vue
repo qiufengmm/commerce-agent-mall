@@ -10,7 +10,10 @@
       <!-- #endif -->
       <view class="user-info-box">
         <view class="portrait-box">
-          <image class="portrait" :src="memberInfo?.icon || '/static/missing-face.png'"></image>
+          <image
+            class="portrait"
+            :src="resolveImageUrl(memberInfo?.icon) || '/static/missing-face.png'"
+          ></image>
         </view>
         <view class="info-box">
           <text class="username">{{ memberInfo?.nickname || memberInfo?.username || '游客' }}</text>
@@ -135,6 +138,7 @@ import { onShow, onNavigationBarButtonTap } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
 import { getMemberCouponListAPI } from '@/apis/coupon'
 import mixListCell from '@/components/mix-list-cell.vue'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== Store 相关 =====
 // 获取会员store

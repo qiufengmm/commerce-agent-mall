@@ -3,13 +3,13 @@
     <!-- 顶部大图 -->
     <view class="top-image">
       <view class="image-wrapper">
-        <image :src="brand.bigPic" mode="aspectFill"></image>
+        <image :src="resolveImageUrl(brand.bigPic)" mode="aspectFill"></image>
       </view>
     </view>
     <!-- 品牌信息 -->
     <view class="info">
       <view class="image-wrapper">
-        <image :src="brand.logo" mode="aspectFit"></image>
+        <image :src="resolveImageUrl(brand.logo)" mode="aspectFit"></image>
       </view>
       <view class="title">
         <text>{{ brand.name }}</text>
@@ -37,7 +37,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFill"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2">{{ item.subTitle }}</text>
@@ -67,6 +67,7 @@ import {
 import type { PmsBrand } from '@/types/brand'
 import type { PmsProduct } from '@/types/product'
 import { useMemberStore } from '@/stores/member'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 品牌信息

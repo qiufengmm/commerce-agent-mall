@@ -2,7 +2,7 @@
   <view class="container">
     <!-- 商品信息 -->
     <view class="goods-section">
-      <image class="goods-img" :src="productPic" mode="aspectFill"></image>
+      <image class="goods-img" :src="resolveImageUrl(productPic)" mode="aspectFill"></image>
       <view class="goods-right">
         <text class="goods-title clamp">{{ productName }}</text>
       </view>
@@ -44,6 +44,7 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { addCommentAPI } from '@/apis/comment'
 import { useMemberStore } from '@/stores/member'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 订单id

@@ -42,7 +42,11 @@
               class="goods-box-single"
               @click="handleShowOrderDetail(item.id)"
             >
-              <image class="goods-img" :src="orderItem.productPic" mode="aspectFill"></image>
+              <image
+                class="goods-img"
+                :src="resolveImageUrl(orderItem.productPic)"
+                mode="aspectFill"
+              ></image>
               <view class="right">
                 <text class="title clamp">{{ orderItem.productName }}</text>
                 <text class="attr-box"
@@ -95,6 +99,7 @@ import {
 } from '@/apis/order'
 import type { OmsOrderDetail } from '@/types/order'
 import type { PageParam } from '@/types/common'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 导航数据 =====
 // Tab 导航列表

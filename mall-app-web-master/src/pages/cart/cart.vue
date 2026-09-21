@@ -42,7 +42,7 @@
             <view class="cart-item" :class="{ 'b-b': index !== cartList.length - 1 }">
               <view class="image-wrapper" @click="handleNavToProductDetail(item.productId)">
                 <image
-                  :src="item.productPic"
+                  :src="resolveImageUrl(item.productPic)"
                   :class="[item.loaded]"
                   mode="aspectFill"
                   lazy-load
@@ -102,6 +102,7 @@ import { useMemberStore } from '@/stores/member'
 import { getCartListAPI, deleteCartAPI, updateCartQuantityAPI } from '@/apis/cart'
 import type { CartItem } from '@/types/cart'
 import { removeCartItemsById } from '@/utils/cart'
+import { resolveImageUrl } from '@/utils/image'
 import uniNumberBox from '@/components/uni-number-box.vue'
 
 // ===== Store 相关 =====

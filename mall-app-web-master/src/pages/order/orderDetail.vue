@@ -32,7 +32,7 @@
       </view>
       <!-- 商品列表 -->
       <view class="g-item" v-for="item in order.orderItemList" :key="item.id">
-        <image :src="item.productPic"></image>
+        <image :src="resolveImageUrl(item.productPic)"></image>
         <view class="right">
           <text class="title clamp">{{ item.productName }}</text>
           <text class="spec">{{ formatProductAttr(item.productAttr) }}</text>
@@ -143,6 +143,7 @@ import { getOrderDetailAPI, cancelUserOrderAPI, confirmReceiveOrderAPI } from '@
 import { checkCommentExistsAPI } from '@/apis/comment'
 import type { OmsOrderDetail } from '@/types/order'
 import type { OmsOrderItem } from '@/types/order'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 订单ID

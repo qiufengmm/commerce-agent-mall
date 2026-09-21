@@ -29,7 +29,7 @@
           <image
             v-if="item.productPic"
             class="goods-img"
-            :src="item.productPic"
+            :src="resolveImageUrl(item.productPic)"
             mode="aspectFill"
           ></image>
           <view v-else class="goods-img goods-img-text">商</view>
@@ -60,6 +60,7 @@ import { getMyCommentListAPI } from '@/apis/comment'
 import type { PmsCommentResult } from '@/types/comment'
 import { useMemberStore } from '@/stores/member'
 import { useCommentPaging } from '@/composables/useCommentPaging'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== Store 相关 =====
 // 会员store

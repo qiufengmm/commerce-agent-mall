@@ -614,7 +614,8 @@ npm run build:h5
 ```
 
 不注入这两个变量也可以：保持前端现有行为，直接访问后端端口（`8080` / `8085`），
-只是不经过 Nginx。**本文档不修改任何前端业务代码。**
+只是不经过 Nginx。**本文档不修改任何前端业务代码**；手机 / 微信开发者工具联调时还需要
+配置 `VITE_MINIO_PUBLIC_ENDPOINT`，见 9.6。
 
 其他限制：
 
@@ -932,6 +933,64 @@ docker compose --profile app --profile edge up -d
 - 只改 `MINIO_PUBLIC_ENDPOINT` 而不改 `MINIO_BIND_ADDR` 时，手机仍然连不上 9000 端口；
 - `MINIO_BIND_ADDR=0.0.0.0` 只影响 MinIO，**不要**照此把 Redis、MongoDB、Elasticsearch
   暴露到局域网（见 1.2 安全警告）。
+
+### 9.6 移动端联调地址（H5 / 微信开发者工具 / 真机）
+
+移动端（`mall-app-web-master`）通过 `src/utils/image.ts` 的 `resolveImageUrl` 统一做图片地址兼容：
+
+- 只重写已知内部 MinIO 地址：`localhost:9000`、`127.0.0.1:9000`、`minio:9000`；
+- 重写目标来自前端环境变量 `VITE_MINIO_PUBLIC_ENDPOINT`；
+- 保留原始 bucket、object path、query 和 hash，并去掉公开地址末尾多余的 `/`；
+- 本地 `/static` 资源、`data:` / `blob:` 地址、外部 CDN 与第三方图片地址一律保持不变；
+- 未配置 `VITE_MINIO_PUBLIC_ENDPOINT` 时原样返回，不会破坏已有 URL。
+
+历史数据库里保存的 `http://localhost:9000/mall/...` 不需要改库，手机端会按上述规则在渲染时重写。
+
+#### H5 开发服务器
+
+```powershell
+Set-Location F:\code\mall\mall-app-web-master
+npm run dev:h5 -- --host 0.0.0.0
+```
+
+H5 开发环境（走 Vite `/api` 代理，后端地址不写死成局域网 IP）：
+
+```dotenv
+VITE_API_BASE_URL=/api
+VITE_MINIO_PUBLIC_ENDPOINT=http://<LAN_IP>:9000
+```
+
+#### 微信开发者工具 / 真机（直连 mall-portal）
+
+```dotenv
+VITE_API_BASE_URL=http://<LAN_IP>:8085
+VITE_MINIO_PUBLIC_ENDPOINT=http://<LAN_IP>:9000
+```
+
+#### 微信开发者工具 / 真机（经 Nginx 代理）
+
+```dotenv
+VITE_API_BASE_URL=http://<LAN_IP>:8088/portal-api
+VITE_MINIO_PUBLIC_ENDPOINT=http://<LAN_IP>:9000
+```
+
+Docker 本机 `.env` 的联调变量只作为文档示例，真实 `.env` 不提交：
+
+```dotenv
+MINIO_BIND_ADDR=0.0.0.0
+NGINX_BIND_ADDR=0.0.0.0
+MINIO_PUBLIC_ENDPOINT=http://<LAN_IP>:9000
+```
+
+必须遵守的约定：
+
+- `MINIO_PUBLIC_ENDPOINT` 决定后端返回给客户端的公开图片地址；
+- `MINIO_BIND_ADDR=0.0.0.0` 决定手机能否访问宿主机 9000，只改公开地址而不改绑定地址时手机仍然连不上；
+- `NGINX_BIND_ADDR=0.0.0.0` 只在需要手机访问 Nginx API / 静态页时开启；
+- Redis、MongoDB、Elasticsearch **不得**暴露到局域网（见 1.2 安全警告）；
+- 微信开发者工具中的业务域名配置与"不校验合法域名"仅用于本地开发说明，不能用于生产环境；
+- 真机测试必须使用手机可访问的宿主机局域网 IP（`ipconfig` 查看），不能填 `localhost` 或 `127.0.0.1`；
+- 联调结束后把两个 `*_BIND_ADDR` 改回 `127.0.0.1` 并重建容器，使绑定生效。
 
 ---
 

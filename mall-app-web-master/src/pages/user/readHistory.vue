@@ -10,7 +10,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.productPic" mode="aspectFill"></image>
+          <image :src="resolveImageUrl(item.productPic)" mode="aspectFill"></image>
         </view>
         <view class="txt">
           <text class="title clamp">{{ item.productName }}</text>
@@ -41,6 +41,7 @@ import { fetchReadHistoryListAPI, clearReadHistoryAPI } from '@/apis/memberReadH
 import type { MemberReadHistory } from '@/types/memberReadHistory'
 import type { PageParam } from '@/types/common'
 import empty from '@/components/empty.vue'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 加载更多状态

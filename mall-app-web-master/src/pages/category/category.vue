@@ -19,12 +19,8 @@
           v-for="item in subCateList"
           :key="item.id"
         >
-          <image
-            :src="
-              item.icon ||
-              'http://localhost:9000/mall/images/20190519/default.png'
-            "
-          ></image>
+          <!-- 分类图标来自后端，需要做 MinIO 局域网地址兼容；缺失时使用本地占位图 -->
+          <image :src="resolveImageUrl(item.icon) || '/static/errorImage.jpg'"></image>
           <text>{{ item.name }}</text>
         </view>
       </view>
@@ -37,6 +33,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getProductCateListAPI } from '@/apis/home'
 import type { PmsProductCategory } from '@/types/product'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 当前分类id

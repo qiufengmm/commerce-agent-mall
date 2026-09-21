@@ -13,7 +13,7 @@
         @click="handleNavToDetail(item)"
       >
         <view class="image-wrapper">
-          <image :src="item.pic" mode="aspectFit"></image>
+          <image :src="resolveImageUrl(item.pic)" mode="aspectFit"></image>
         </view>
         <text class="title clamp">{{ item.name }}</text>
         <text class="title2">{{ item.subTitle }}</text>
@@ -36,6 +36,7 @@ import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getNewProductListAPI } from '@/apis/home'
 import type { PmsProduct } from '@/types/product'
 import type { PageParam } from '@/types/common'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 加载更多状态

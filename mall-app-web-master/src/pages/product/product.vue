@@ -114,7 +114,7 @@
           <image
             v-if="item.memberIcon"
             class="portrait"
-            :src="item.memberIcon"
+            :src="resolveImageUrl(item.memberIcon)"
             mode="aspectFill"
           ></image>
           <view v-else class="portrait portrait-text">{{ formatFirstChar(item.memberNickName) }}</view>
@@ -137,7 +137,7 @@
       </view>
       <view class="brand-box" @click="handleNavToBrandDetail">
         <view class="image-wrapper">
-          <image :src="brand.logo" class="loaded" mode="aspectFit"></image>
+          <image :src="resolveImageUrl(brand.logo)" class="loaded" mode="aspectFit"></image>
         </view>
         <view class="title">
           <text>{{ brand.name }}</text>
@@ -184,7 +184,7 @@
       <view class="mask"></view>
       <view class="layer attr-content" @click.stop>
         <view class="a-t">
-          <image :src="product.pic"></image>
+          <image :src="resolveImageUrl(product.pic)"></image>
           <view class="right">
             <text class="price">¥{{ product.price }}</text>
             <text class="stock">库存：{{ product.stock }}件</text>
@@ -292,6 +292,7 @@ import type { PmsComment } from '@/types/comment'
 import type { SmsCoupon } from '@/types/coupon'
 import { formatDate } from '@/utils/date'
 import { goBackOrHome } from '@/utils/navigation'
+import { resolveImageUrl, resolveImageUrlInHtml } from '@/utils/image'
 
 // ===== 导航栏相关 =====
 const statusBarHeight = ref(0)
@@ -474,13 +475,13 @@ onPageScroll((e: { scrollTop: number }) => {
 
 // ===== 初始化方法 =====
 
-// 初始化轮播图列表
+// 初始化轮播图列表（相册图来自后端，统一做 MinIO 局域网地址兼容）
 const initImgList = () => {
   const tempPics = product.value.albumPics?.split(',') || []
   tempPics.unshift(product.value.pic)
   for (const item of tempPics) {
     if (item != null && item !== '') {
-      imgList.value.push(item)
+      imgList.value.push(resolveImageUrl(item))
     }
   }
 }
@@ -605,7 +606,8 @@ const initPromotionTipList = (data: any) => {
 
 // 初始化商品详情HTML
 const initProductDesc = () => {
-  let rawhtml = product.value.detailMobileHtml || ''
+  // 图文详情里的图片地址同样可能是内部 MinIO 地址，先统一转换
+  let rawhtml = resolveImageUrlInHtml(product.value.detailMobileHtml)
 
   // #ifdef H5
   const tempNode = document.createElement('div')

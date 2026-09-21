@@ -3,6 +3,10 @@
 interface ImportMetaEnv {
   /** 是否使用支付宝支付（H5端启用） */
   readonly VITE_USE_ALIPAY: string
+  /** 接口基础地址 */
+  readonly VITE_API_BASE_URL?: string
+  /** MinIO 公开访问地址，用于重写后端返回的内部图片地址 */
+  readonly VITE_MINIO_PUBLIC_ENDPOINT?: string
 }
 
 interface ImportMeta {

@@ -28,7 +28,7 @@
         <image
           v-if="item.memberIcon"
           class="portrait"
-          :src="item.memberIcon"
+          :src="resolveImageUrl(item.memberIcon)"
           mode="aspectFill"
         ></image>
         <view v-else class="portrait portrait-text">{{ formatFirstChar(item.memberNickName) }}</view>
@@ -44,7 +44,7 @@
               v-for="(pic, index) in formatPics(item.pics)"
               :key="index"
               class="pic-item"
-              :src="pic"
+              :src="resolveImageUrl(pic)"
               mode="aspectFill"
             ></image>
           </view>
@@ -67,6 +67,7 @@ import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { getCommentListAPI } from '@/apis/comment'
 import type { PmsComment } from '@/types/comment'
 import { useCommentPaging } from '@/composables/useCommentPaging'
+import { resolveImageUrl } from '@/utils/image'
 
 // ===== 页面数据 =====
 // 商品id
