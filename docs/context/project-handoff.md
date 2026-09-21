@@ -10,7 +10,7 @@
 - 当前分支：`main`
 - `main` 已包含 Docker 本地运行收尾提交 `c629448`、`ea338b7`、`32c06e6`，核心接口与端到端测试提交 `085197b`，以及移动端 MinIO 局域网图片适配提交 `7b9a5e2`；文档更新后的最新提交以 `git log --oneline -1` 为准。
 - `origin/main` 尚未包含上述本地提交，当前未执行 push。
-- `feature/core-flow-tests` 已合并到 `main`，对应 worktree 当前干净但尚未删除；删除该明确路径需单独确认。
+- `feature/core-flow-tests` 与 `feature/mobile-minio-lan` 均已合并到 `main`，对应 worktree 当前干净但尚未删除；删除这些明确路径需单独确认。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
 - 主工作区应保持干净；合并前主工作区原有改动保留在一个可恢复 stash 中，确认不再需要后再单独处理。
 
@@ -38,7 +38,7 @@
 1. 在具备设备和可访问 Docker 服务后，完成 H5、微信开发者工具和局域网真机 MinIO 图片联调，并验证核心页面图片 HTTP 200、MinIO 公开读、CORS 与微信本地安全域名配置。
 2. 复评 Elasticsearch 遗留项：上下架事务边界、旧索引清理、同步接口保护和 MySQL 降级搜索。
 3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
-4. 用户确认后清理已合并的 `core-flow-tests` worktree；保留功能分支历史。
+4. 用户确认后清理已合并的 `core-flow-tests`、`mobile-minio-lan` worktree；保留功能分支历史。
 5. 测试和审查完成后，由用户确认是否 push 本地 `main`；未确认前不得 push。
 
 ## 新对话必须遵守
