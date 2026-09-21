@@ -7,7 +7,7 @@
         <view class="img-wrapper">
           <image
             class="pic"
-            src="/static/notice/ad1.jpg"
+            src="/static/notice/notice-banner-01.jpg"
           ></image>
         </view>
         <text class="introduce">
@@ -26,7 +26,7 @@
         <view class="img-wrapper">
           <image
             class="pic"
-            src="/static/notice/ad2.jpg"
+            src="/static/notice/notice-banner-02.jpg"
           ></image>
           <view class="cover">活动结束</view>
         </view>

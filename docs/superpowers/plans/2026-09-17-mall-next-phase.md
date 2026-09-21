@@ -115,7 +115,8 @@
 
 - [x] 为 H5、微信开发者工具和局域网真机分别定义图片 API 地址。
 - [x] 将手机访问地址从 `localhost:9000` 改为可访问的局域网 IP 或环境变量。
-- [x] 已验证夸克可访问局域网 MinIO 健康接口、Nginx 和 H5 入口；已修复 H5 经 Nginx 访问时 `/static/**` 绝对路径资源映射，正式 `8088` 上 `/static/notice/ad1.jpg` 与 `/h5/static/notice/ad1.jpg` 均返回 200，Nginx 为 healthy。
+- [x] 已验证夸克可访问局域网 MinIO 健康接口、Nginx 和 H5 入口；已修复 H5 经 Nginx 访问时 `/static/**` 绝对路径资源映射，改名前正式 `8088` 上 `/static/notice/ad1.jpg` 与 `/h5/static/notice/ad1.jpg` 均返回 200，Nginx 为 healthy。
+- [x] 已确认夸克广告过滤会误拦截通知页的 `ad1.jpg` / `ad2.jpg` 页面内嵌资源；已将源码资源改名为 `notice-banner-01.jpg` / `notice-banner-02.jpg`，并补充联调文档与验收记录。
 - [ ] 使用 MinIO 中真实存在的商品对象验证首页、分类、商品详情、评价、购物车和订单图片均返回 200，并完成 MinIO 公开读、跨域和微信开发者工具安全域名配置。
 - [x] 独立提交：`7b9a5e2 完善移动端 MinIO 局域网图片访问`，已快进合并到 `main`。
 
