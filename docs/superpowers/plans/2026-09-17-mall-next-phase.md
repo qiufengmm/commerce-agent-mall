@@ -140,10 +140,31 @@
 
 ---
 
+### Task 8: 修复测试基线（新增，待执行）
+
+**Plan:** `docs/superpowers/plans/2026-09-21-test-baseline-repair.md`
+
+- [ ] 将 `mall-search` 旧的完整外部环境测试拆为默认隔离测试；外部集成测试必须显式运行。
+- [ ] 将 `PortalProductDaoTests` 改为可重复的 H2/MyBatis DAO 测试，不连接开发 MySQL。
+- [ ] 分模块运行默认测试并读取 Surefire 报告，不能用 failure-ignore 掩盖失败。
+- [ ] 生成 `test-baseline-repair-report.md`，主 Agent 完成 diff、敏感文件和测试审查。
+
+---
+
+### Task 9: Elasticsearch 遗留项治理（新增，待执行）
+
+**Plan:** `docs/superpowers/plans/2026-09-21-es-legacy-hardening.md`
+
+- [ ] 补齐商品上下架、推荐、新品、删除状态的事务边界和提交后事件测试。
+- [ ] 让全量导入清理陈旧 ES 文档，并验证数据源异常不误删。
+- [ ] 用内部 Token 保护 import/create/delete/sync 写接口，保留搜索读接口匿名访问。
+- [ ] 实现默认关闭、可配置启用的 MySQL 降级搜索及分页测试。
+- [ ] 生成 `es-legacy-hardening-report.md`，完成主 Agent 只读审查和模块测试。
+
+---
+
 ## 当前执行顺序
 
-1. 用户确认后清理已合并的 `core-flow-tests` worktree。
-2. 按只读清单完成 Docker API 在线冒烟，并记录真实响应。
-3. 在具备设备和可访问 Docker 服务的环境后完成手机/微信真机图片联调。
-4. Elasticsearch 遗留项专项处理。
-5. 商品导购智能体设计与实现。
+1. 修复默认测试基线并隔离外部集成测试。
+2. Elasticsearch 遗留项专项处理。
+3. 商品导购智能体设计与实现。
