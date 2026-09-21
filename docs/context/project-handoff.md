@@ -8,11 +8,10 @@
 
 - 项目根目录：`F:\code\mall`
 - 当前分支：`main`
-- `main` 已包含 Docker 本地运行收尾提交 `c629448`、`ea338b7`、`32c06e6`，核心接口与端到端测试提交 `085197b`，以及移动端 MinIO 局域网图片适配提交 `7b9a5e2`；文档更新后的最新提交以 `git log --oneline -1` 为准。
-- `origin/main` 尚未包含上述本地提交，当前未执行 push。
-- `feature/core-flow-tests` 与 `feature/mobile-minio-lan` 均已合并到 `main`，对应 worktree 当前干净但尚未删除；删除这些明确路径需单独确认。
+- `main` 当前提交为 `a7cb05e 补充测试基线与ES遗留项治理计划`；功能代码已同步到 `origin/main`，仅本次治理计划提交尚未 push，后续需用户明确确认后再 push。
+- `git worktree list` 当前仅保留 `F:\code\mall` 的 `main`，历史功能 worktree 已按确认逐个清理。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
-- 主工作区应保持干净；合并前主工作区原有改动保留在一个可恢复 stash 中，确认不再需要后再单独处理。
+- 主工作区应保持干净；运行时 `.env`、数据库快照、Docker 数据卷和凭据不纳入 Git。
 
 ## 已完成模块
 
@@ -21,7 +20,7 @@
 3. Elasticsearch：搜索闭环、1-based 分页、深分页保护、商品同步、内部 Token、批量上限和运行文档已完成。
 4. 订单/支付/库存一致性：状态条件更新、支付归属/金额校验、库存保护、优惠券绑定和历史数据订正已完成。
 5. Docker 本地全栈环境：MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO、三个 Java 服务和 Nginx 已编排；MinIO 使用固定 Quay 镜像，应用构建跳过旧 Fabric8 Docker 插件，Nginx 代理与健康检查已修复。
-6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射已由 `daa410b` 修复，正式 8088 上两条 H5 静态路径均为 200 且 Nginx healthy，夸克已验证可访问 9000、8088 和 H5 入口，真实 MinIO 商品对象 200 仍待验证。
+6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射、通知图片文件名兼容和真实 MinIO 对象访问均已验证；夸克手机最终复测正常，微信开发者工具图片验收也已完成。正式 HTTPS 合法域名仍留待后续环境配置。
 
 ## Docker 验证基线
 
@@ -35,11 +34,11 @@
 
 ## 当前剩余任务
 
-1. 使用 bucket 中真实存在的 MinIO 商品对象完成 H5、微信开发者工具和局域网真机核心页面图片 HTTP 200 验证，并确认 MinIO 公开读、CORS 与微信本地安全域名配置。
-2. 复评 Elasticsearch 遗留项：上下架事务边界、旧索引清理、同步接口保护和 MySQL 降级搜索。
-3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
-4. 用户确认后清理已合并的 `core-flow-tests`、`mobile-minio-lan` worktree；保留功能分支历史。
-5. 测试和审查完成后，由用户确认是否 push 本地 `main`；未确认前不得 push。
+1. 修复测试基线：将旧的 `@SpringBootTest` 外部依赖测试隔离为默认可重复的 H2/单元测试，并保留明确的外部集成入口。
+2. 处理 Elasticsearch 遗留项：商品状态事务边界、全量导入陈旧文档清理、所有 ES 写接口 Token 保护和受控 MySQL 降级搜索。
+3. 两项 worktree 任务完成后，由主 Agent 读取报告、检查真实 diff、做只读审查并在 `main` 重跑验证。
+4. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
+5. 用户确认后 push 当前本地治理计划及后续合并提交；未确认前不得 push。
 
 ## 新对话必须遵守
 
