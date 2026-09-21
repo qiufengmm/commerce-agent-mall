@@ -609,8 +609,9 @@ docker compose --profile edge up -d
 
 ```text
 http://<LAN_IP>:8088/h5/                       # H5 页面
-http://<LAN_IP>:8088/static/notice/ad1.jpg     # H5 页面内绝对路径静态资源
-http://<LAN_IP>:8088/h5/static/notice/ad1.jpg  # 带 /h5 前缀，等价可读
+http://<LAN_IP>:8088/static/notice/notice-banner-01.jpg # H5 页面内绝对路径静态资源
+http://<LAN_IP>:8088/h5/static/notice/notice-banner-01.jpg # 带 /h5 前缀，等价可读
+http://<LAN_IP>:8088/static/notice/notice-banner-02.jpg # 通知页第二张静态图片
 http://<LAN_IP>:9000/mall/<真实对象路径>         # MinIO 商品图片（必须真实存在）
 ```
 
@@ -974,6 +975,10 @@ docker compose --profile app --profile edge up -d
 - 保留原始 bucket、object path、query 和 hash，并去掉公开地址末尾多余的 `/`；
 - 本地 `/static` 资源、`data:` / `blob:` 地址、外部 CDN 与第三方图片地址一律保持不变；
 - 未配置 `VITE_MINIO_PUBLIC_ENDPOINT` 时原样返回，不会破坏已有 URL。
+
+通知页本地图片使用 `notice-banner-01.jpg`、`notice-banner-02.jpg` 等中性文件名。
+夸克浏览器的广告过滤可能根据 `ad1.jpg`、`ad2.jpg` 这类文件名拦截页面内嵌图片；
+遇到通知图片空白时，先确认资源文件名已更新并重新构建 H5，再检查夸克广告过滤或站点白名单。
 
 历史数据库里保存的 `http://localhost:9000/mall/...` 不需要改库，手机端会按上述规则在渲染时重写。
 
