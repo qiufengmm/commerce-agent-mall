@@ -54,3 +54,13 @@
 - Portal 商品 DAO 测试在干净环境中可重复运行，且不需要 Docker 或开发数据库。
 - 若保留外部集成测试，默认测试与集成测试边界、命令和失败责任清晰可见。
 - 工作树不 commit、push 或 merge。
+
+## 实际完成记录（2026-09-21）
+
+- [x] `mall-search` 默认测试改为 H2/隔离测试；在线 ES 映射测试保留为 `EsProductMappingManualIT`，默认不执行。
+- [x] `mall-portal` 商品 DAO 测试改为 H2 隔离测试；门户完整上下文使用 H2、Mongo/RabbitMQ/Redis 测试隔离。
+- [x] 顶层 `skipTests` 改为 `false`，默认 Maven 测试不再静默跳过。
+- [x] 功能提交：`d6148bd 修复测试基线并隔离外部依赖`。
+- [x] 本地合并提交：`74610f2 合并测试基线修复`。
+- [x] 合并后在 `main` 的 `mall-master` 重新执行 `mvn test`：267 个测试通过，`BUILD SUCCESS`。
+- [x] 未执行真实 MySQL 写操作、真实 ES 写接口或远程 push；已清理 `test-baseline-repair` worktree 和本地功能分支。

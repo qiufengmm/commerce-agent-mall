@@ -8,8 +8,8 @@
 
 - 项目根目录：`F:\code\mall`
 - 当前分支：`main`
-- `main` 当前提交为 `a7cb05e 补充测试基线与ES遗留项治理计划`；功能代码已同步到 `origin/main`，仅本次治理计划提交尚未 push，后续需用户明确确认后再 push。
-- `git worktree list` 当前仅保留 `F:\code\mall` 的 `main`，历史功能 worktree 已按确认逐个清理。
+- `main` 当前提交为 `a3300a3 更新测试基线交接与计划记录`，较 `origin/main` 超前 5 个本地提交；后续需用户明确确认后再 push。
+- `git worktree list` 当前保留 `F:\code\mall` 的 `main` 和 Elasticsearch 遗留项工作树 `F:\code\mall\.worktrees\es-legacy-hardening`；测试基线工作树已合并并清理。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
 - 主工作区应保持干净；运行时 `.env`、数据库快照、Docker 数据卷和凭据不纳入 Git。
 
@@ -34,11 +34,10 @@
 
 ## 当前剩余任务
 
-1. 修复测试基线：将旧的 `@SpringBootTest` 外部依赖测试隔离为默认可重复的 H2/单元测试，并保留明确的外部集成入口。
-2. 处理 Elasticsearch 遗留项：商品状态事务边界、全量导入陈旧文档清理、所有 ES 写接口 Token 保护和受控 MySQL 降级搜索。
-3. 两项 worktree 任务完成后，由主 Agent 读取报告、检查真实 diff、做只读审查并在 `main` 重跑验证。
-4. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
-5. 用户确认后 push 当前本地治理计划及后续合并提交；未确认前不得 push。
+1. 处理 Elasticsearch 遗留项：商品状态事务边界、全量导入陈旧文档清理、所有 ES 写接口 Token 保护和受控 MySQL 降级搜索。
+2. 完成 Elasticsearch 遗留项工作树后，由主 Agent 读取报告、检查真实 diff、做只读审查并在 `main` 重跑验证。
+3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
+4. 用户确认后 push 当前本地治理计划及后续合并提交；未确认前不得 push。
 
 ## 新对话必须遵守
 
