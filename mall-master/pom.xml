@@ -32,7 +32,8 @@
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <skipTests>true</skipTests>
+        <!--默认执行测试；如需跳过请使用显式的 -DskipTests=true，避免测试被静默跳过-->
+        <skipTests>false</skipTests>
         <docker.host>http://192.168.3.101:2375</docker.host>
         <docker.maven.plugin.version>0.45.1</docker.maven.plugin.version>
         <pagehelper-starter.version>2.1.1</pagehelper-starter.version>
