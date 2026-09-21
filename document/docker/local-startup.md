@@ -583,6 +583,37 @@ docker compose --profile edge up -d
 - 反向代理：`/admin-api/` → mall-admin 8080、`/portal-api/` → mall-portal 8085、
   `/es-api/` → mall-search 8081
 
+**H5 通过 Nginx 访问时的路径规则（重要）**：
+
+| 请求路径 | 实际读取位置 | 说明 |
+| --- | --- | --- |
+| `/h5/` | `mall-app-web-master/dist/build/h5/index.html` | H5 页面入口 |
+| `/h5/static/**` | `mall-app-web-master/dist/build/h5/static/**` | 带前缀访问 H5 静态资源 |
+| `/static/**` | `mall-app-web-master/dist/build/h5/static/**` | H5 页面内**运行时**使用的绝对路径 |
+
+- H5 入口统一通过 `/h5/` 访问；uni-app 的 H5 产物在运行时会按**绝对路径**
+  `/static/...` 请求静态资源，浏览器不会自动补 `/h5` 前缀，
+  因此 Nginx 单独增加 `location /static/` 映射到 H5 静态目录；
+- 这条映射只指向 **H5 静态目录**，不会指向管理后台目录；
+  管理后台使用 `base: './'`，只引用 `./assets/**`，`dist` 下没有 `static` 目录，
+  因此新增映射不会覆盖或破坏管理后台资源；
+- `/static/**` 是 **H5 前端自带的本地静态资源**（图标、占位图、字体等），
+  与 MinIO 里的商品图片**不是同一类资源**；
+- MinIO 商品图片的公开地址形如 `http://<host>:9000/mall/<object>`，
+  由 `MINIO_PUBLIC_ENDPOINT` 决定，**不要**为它额外增加 `/minio/` 反向代理；
+- 验证 MinIO 图片时必须使用**真实存在的对象路径**（例如先在管理后台上传图片，
+  再用返回的 URL 验证）。访问不存在的对象路径会返回 `NoSuchKey`，
+  这只能说明"对象不存在"，**不能**判定为网络不通或端口不可达。
+
+局域网联调示例（`<LAN_IP>` 换成宿主机局域网 IP）：
+
+```text
+http://<LAN_IP>:8088/h5/                       # H5 页面
+http://<LAN_IP>:8088/static/notice/ad1.jpg     # H5 页面内绝对路径静态资源
+http://<LAN_IP>:8088/h5/static/notice/ad1.jpg  # 带 /h5 前缀，等价可读
+http://<LAN_IP>:9000/mall/<真实对象路径>         # MinIO 商品图片（必须真实存在）
+```
+
 **前端必须先构建**，否则目录为空、页面会 404，这时不要认为"全栈已可访问"：
 
 ```powershell
@@ -1167,6 +1198,8 @@ wsl -d docker-desktop sysctl -w vm.max_map_count=262144
 | `minio-init` 显示 `Exited (0)` | 一次性任务成功执行完即退出，属正常；用 `docker compose logs minio-init` 确认 bucket 与只读策略均已完成 |
 | `minio-init` 显示 `Exited (1)`（或非 0）且 `mall-admin` 未启动 | `minio-init` 失败会阻止 `mall-admin` 启动（`depends_on: service_completed_successfully`），这是预期保护行为；用 `docker compose logs minio-init` 定位原因（凭据、bucket 名、网络），修复后重新 `docker compose up -d` |
 | Nginx 页面 404 | 前端产物未构建，或路径与 `ADMIN_WEB_DIST_DIR` / `H5_WEB_DIST_DIR` 不一致 |
+| H5 页面能打开，但图标 / 图片 / 字体 404 | 页面内按绝对路径请求 `/static/**`，需要 Nginx 的 `location /static/` 映射到 H5 静态目录，见 4.5 |
+| 访问 `http://<host>:9000/minio/health/live` 返回 `NoSuchKey` | 这是 MinIO 返回的"对象不存在"，说明 9000 端口可达；验证图片必须用真实存在的对象路径，见 4.5 |
 | `/admin-api` 返回 502 | `app` profile 未启动，或 mall-admin 未健康 |
 | 前端请求打到 8080/8085 但走的是 Nginx | 构建时未注入 `VITE_BASE_SERVER_URL=/admin-api` 与 `VITE_API_BASE_URL=/portal-api`，见 4.5 |
 | 搜索结果为空 | 未执行 `/esProduct/importAll`，见第 10 节 |
