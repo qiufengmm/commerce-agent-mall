@@ -131,7 +131,16 @@ curl.exe -I "http://<LAN_IP>:8088/h5/static/notice/ad1.jpg"
 | 阶段 | `/static/notice/ad1.jpg` | `/h5/static/notice/ad1.jpg` |
 | --- | --- | --- |
 | 修复前 | 失败 | 成功 |
-| 修复后（需实测填写） | 待验证，期望 `200` | 保持 `200` |
+| 修复后（正式 8088，2026-09-21） | `200` | `200` |
+
+正式 Compose Nginx 已使用根目录 `.env` 重建并报告 `healthy`；实际局域网验证命令如下：
+
+```powershell
+curl.exe -I "http://192.168.85.101:8088/static/notice/ad1.jpg"
+curl.exe -I "http://192.168.85.101:8088/h5/static/notice/ad1.jpg"
+```
+
+两条响应均为 `HTTP/1.1 200 OK`，内容类型为 `image/jpeg`。
 
 ---
 

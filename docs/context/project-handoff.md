@@ -21,7 +21,7 @@
 3. Elasticsearch：搜索闭环、1-based 分页、深分页保护、商品同步、内部 Token、批量上限和运行文档已完成。
 4. 订单/支付/库存一致性：状态条件更新、支付归属/金额校验、库存保护、优惠券绑定和历史数据订正已完成。
 5. Docker 本地全栈环境：MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO、三个 Java 服务和 Nginx 已编排；MinIO 使用固定 Quay 镜像，应用构建跳过旧 Fabric8 Docker 插件，Nginx 代理与健康检查已修复。
-6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射已由 `daa410b` 修复，夸克已验证可访问 9000、8088 和 H5 入口，真实 MinIO 商品对象 200 仍待验证。
+6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射已由 `daa410b` 修复，正式 8088 上两条 H5 静态路径均为 200 且 Nginx healthy，夸克已验证可访问 9000、8088 和 H5 入口，真实 MinIO 商品对象 200 仍待验证。
 
 ## Docker 验证基线
 
