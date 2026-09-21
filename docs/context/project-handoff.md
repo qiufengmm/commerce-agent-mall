@@ -8,7 +8,7 @@
 
 - 项目根目录：`F:\code\mall`
 - 当前分支：`main`
-- `main` 已包含 Docker 本地运行收尾提交 `c629448`、`ea338b7`、`32c06e6`，以及核心接口与端到端测试提交 `085197b`；文档更新后的最新提交以 `git log --oneline -1` 为准。
+- `main` 已包含 Docker 本地运行收尾提交 `c629448`、`ea338b7`、`32c06e6`，核心接口与端到端测试提交 `085197b`，以及移动端 MinIO 局域网图片适配提交 `7b9a5e2`；文档更新后的最新提交以 `git log --oneline -1` 为准。
 - `origin/main` 尚未包含上述本地提交，当前未执行 push。
 - `feature/core-flow-tests` 已合并到 `main`，对应 worktree 当前干净但尚未删除；删除该明确路径需单独确认。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
@@ -21,6 +21,7 @@
 3. Elasticsearch：搜索闭环、1-based 分页、深分页保护、商品同步、内部 Token、批量上限和运行文档已完成。
 4. 订单/支付/库存一致性：状态条件更新、支付归属/金额校验、库存保护、优惠券绑定和历史数据订正已完成。
 5. Docker 本地全栈环境：MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO、三个 Java 服务和 Nginx 已编排；MinIO 使用固定 Quay 镜像，应用构建跳过旧 Fabric8 Docker 插件，Nginx 代理与健康检查已修复。
+6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；代码测试与构建通过，真机运行时验证待具备设备和可访问服务后执行。
 
 ## Docker 验证基线
 
@@ -34,7 +35,7 @@
 
 ## 当前剩余任务
 
-1. 做 H5、微信开发者工具和局域网真机 MinIO 图片联调。
+1. 在具备设备和可访问 Docker 服务后，完成 H5、微信开发者工具和局域网真机 MinIO 图片联调，并验证核心页面图片 HTTP 200、MinIO 公开读、CORS 与微信本地安全域名配置。
 2. 复评 Elasticsearch 遗留项：上下架事务边界、旧索引清理、同步接口保护和 MySQL 降级搜索。
 3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
 4. 用户确认后清理已合并的 `core-flow-tests` worktree；保留功能分支历史。
