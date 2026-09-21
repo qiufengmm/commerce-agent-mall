@@ -1,0 +1,29 @@
+# 测试专用配置：仅供 @ActiveProfiles("test") 的单元测试使用，不影响生产环境。
+# 目标：让完整 Spring 上下文在启动过程中不连接 MongoDB、RabbitMQ、Redis、Elasticsearch 和开发 MySQL。
+spring:
+  # 显式使用 H2 内存库，避免依赖 Spring Boot「无数据源配置时回退嵌入式库」的隐式行为
+  datasource:
+    url: jdbc:h2:mem:mall_portal_context_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  # 彻底关闭 MongoDB 自动配置：只创建 MongoClient 也会触发驱动监控线程连接 localhost:27017，
+  # 因此测试中排除 Mongo 相关自动配置，MongoDB 仓储由测试类用 @MockBean 替换
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+      # 彻底关闭 Redis 自动配置：排除后不会再创建 Lettuce/Jedis 连接工厂，
+      # 上下文仍需要的 RedisConnectionFactory 由测试类用 @MockBean 提供替身，避免连接 localhost:6379
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  rabbitmq:
+    # 不创建 RabbitAdmin，避免启动时声明队列/交换机而连接 localhost:5672
+    dynamic: false
+    listener:
+      simple:
+        # 不自动启动 @RabbitListener 监听器容器
+        auto-startup: false
+      direct:
+        auto-startup: false
