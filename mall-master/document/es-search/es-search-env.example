@@ -9,8 +9,15 @@ MALL_SEARCH_BASE_URL=http://localhost:8081
 
 # 内部同步接口令牌，mall-admin 与 mall-search 必须使用同一个值
 # 生成示例：openssl rand -hex 32
-# 未配置时：mall-search 同步接口返回 503，mall-admin 跳过同步并记录 warn 日志
+# 未配置时：mall-search 写接口返回 503（含 importAll / create / delete / sync），
+#          mall-admin 跳过同步并记录 warn 日志
 MALL_SEARCH_INTERNAL_TOKEN=<请自行生成随机令牌>
+
+# 门户 MySQL 降级搜索开关，默认 false（关闭）
+# 关闭：mall-search 调用失败时原样暴露异常
+# 开启：mall-search 调用失败时才降级到MySQL商品读查询，
+#       不具备ES相关度排序能力，只保证分页结构完整与排序稳定（默认 id desc）
+MALL_SEARCH_MYSQL_FALLBACK_ENABLED=false
 
 # 数据库连接信息（仓库内不含数据源配置，本地启动时自行注入）
 # 请使用本机开发库账号，不要提交真实密码

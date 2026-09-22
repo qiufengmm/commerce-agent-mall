@@ -28,4 +28,9 @@ public class MallSearchClientProperties {
      * 读取超时时间(毫秒)
      */
     private Integer readTimeoutMillis = 5000;
+    /**
+     * 是否在搜索服务调用失败时降级到MySQL查询，默认关闭。
+     * 对应环境变量 MALL_SEARCH_MYSQL_FALLBACK_ENABLED，关闭时搜索服务异常原样暴露，不静默查询MySQL。
+     */
+    private boolean mysqlFallbackEnabled = false;
 }

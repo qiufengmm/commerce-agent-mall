@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Method;
@@ -70,6 +71,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     private ApplicationEventPublisher eventPublisher;
 
     @Override
+    @Transactional
     public int create(PmsProductParam productParam) {
         int count;
         //创建商品
@@ -124,6 +126,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
+    @Transactional
     public int update(Long id, PmsProductParam productParam) {
         int count;
         //更新商品信息
@@ -261,6 +264,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
+    @Transactional
     public int updatePublishStatus(List<Long> ids, Integer publishStatus) {
         PmsProduct record = new PmsProduct();
         record.setPublishStatus(publishStatus);
@@ -273,6 +277,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
+    @Transactional
     public int updateRecommendStatus(List<Long> ids, Integer recommendStatus) {
         PmsProduct record = new PmsProduct();
         record.setRecommandStatus(recommendStatus);
@@ -284,6 +289,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
+    @Transactional
     public int updateNewStatus(List<Long> ids, Integer newStatus) {
         PmsProduct record = new PmsProduct();
         record.setNewStatus(newStatus);
@@ -295,6 +301,7 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
+    @Transactional
     public int updateDeleteStatus(List<Long> ids, Integer deleteStatus) {
         PmsProduct record = new PmsProduct();
         record.setDeleteStatus(deleteStatus);
@@ -319,7 +326,8 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     /**
-     * 发布单个商品的索引同步事件，有事务时在MySQL事务提交后触发，没有事务时立即触发
+     * 发布单个商品的索引同步事件，只在MySQL事务成功提交后触发；
+     * 调用方必须运行在Spring事务中，没有事务时事件不会触发同步
      * 发布失败只记录warn日志，不回滚也不影响商品操作结果
      */
     private void publishSyncEvent(Long id) {
@@ -334,7 +342,8 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     /**
-     * 发布批量商品的索引同步事件，有事务时在MySQL事务提交后触发，没有事务时立即触发
+     * 发布批量商品的索引同步事件，只在MySQL事务成功提交后触发；
+     * 调用方必须运行在Spring事务中，没有事务时事件不会触发同步
      * 发布失败只记录warn日志，不回滚也不影响商品操作结果
      */
     private void publishSyncEvent(List<Long> ids) {
