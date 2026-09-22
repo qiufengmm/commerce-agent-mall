@@ -23,8 +23,11 @@ mybatis:
 mall:
   search:
     # 内部服务调用令牌，本地启动前需导出环境变量MALL_SEARCH_INTERNAL_TOKEN（mall-admin与mall-search使用同一个值），仓库内不存放真实令牌
-    # 鉴权行为：服务端未配置令牌时同步接口(/esProduct/sync/**)返回503并记录error日志；
-    #          请求缺少X-Internal-Token或令牌不匹配返回401；普通搜索接口不需要令牌
+    # 鉴权行为：importAll、create/{id}、delete/{id}、delete/batch、sync/{id}、sync/batch
+    #          六条写路径统一受X-Internal-Token保护；
+    #          服务端未配置令牌时写接口返回503并记录error日志，
+    #          请求缺少X-Internal-Token或令牌不匹配返回401；
+    #          只读搜索接口(search、search/simple、search/relate、recommend/{id})保持匿名，不需要令牌
     internal-token: ${MALL_SEARCH_INTERNAL_TOKEN:}
     # 单次批量同步商品id数量上限，请求id数量为空或超过该上限时返回400
     # 该值需与mall-admin的mall.search.max-sync-batch-size保持一致

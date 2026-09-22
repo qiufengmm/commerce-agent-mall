@@ -5,6 +5,7 @@ import com.macro.mall.common.api.CommonResult;
 import com.macro.mall.search.config.SearchSyncProperties;
 import com.macro.mall.search.domain.EsProduct;
 import com.macro.mall.search.domain.EsProductRelatedInfo;
+import com.macro.mall.search.exception.ImportAllConflictException;
 import com.macro.mall.search.service.EsProductService;
 import com.macro.mall.search.util.SearchPageUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,12 +40,17 @@ public class EsProductController {
     @Autowired
     private SearchSyncProperties searchSyncProperties;
 
-    @Operation(summary = "导入所有数据库中商品到ES")
+    @Operation(summary = "导入所有数据库中商品到ES，返回本次导入的有效商品数量，同时清理陈旧ES文档")
     @RequestMapping(value = "/importAll", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult<Integer> importAllList() {
-        int count = esProductService.importAll();
-        return CommonResult.success(count);
+        try {
+            int count = esProductService.importAll();
+            return CommonResult.success(count);
+        } catch (ImportAllConflictException e) {
+            LOGGER.warn("商品索引全量导入请求被拒绝，原因:{}", e.getMessage());
+            return CommonResult.failed("商品索引全量导入正在执行中，请稍后重试");
+        }
     }
 
     @Operation(summary = "根据id删除商品")

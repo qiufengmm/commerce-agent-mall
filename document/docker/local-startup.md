@@ -114,12 +114,13 @@ docker compose --env-file .env --profile app --profile edge up -d
 curl.exe http://localhost:9000/minio/health/live
 docker compose --env-file .env run --rm --no-deps minio-init `
   'mc alias set localminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" > /dev/null && mc ls --recursive --json localminio/mall && mc anonymous get localminio/mall'
-curl.exe -X POST http://localhost:8081/esProduct/importAll
+curl.exe -X POST http://localhost:8081/esProduct/importAll `
+  -H "X-Internal-Token: $env:MALL_SEARCH_INTERNAL_TOKEN"
 curl.exe http://localhost:9200/_cat/indices?v
 curl.exe http://localhost:9200/pms/_count
 ```
 
-作用：确认 MinIO 健康、`mall` bucket 存在且配置为匿名下载，并把 MySQL 在售商品导入 ES 的 `pms` 索引。该命令本身不上传文件；真实上传应在管理后台新增/编辑商品并上传图片，再用返回的匿名 URL 验证文件可以直接打开，URL 应以 `http://localhost:9000/mall/` 开头。
+作用：确认 MinIO 健康、`mall` bucket 存在且配置为匿名下载，并把 MySQL 在售商品导入 ES 的 `pms` 索引。`importAll` 属于写接口，必须带 `X-Internal-Token`。该命令本身不上传文件；真实上传应在管理后台新增/编辑商品并上传图片，再用返回的匿名 URL 验证文件可以直接打开，URL 应以 `http://localhost:9000/mall/` 开头。
 
 ### 10. 停止服务
 
@@ -463,7 +464,9 @@ bash document/docker/check-env.sh
 - 带 `:?` 约束的变量（如 `MYSQL_ROOT_PASSWORD`、`MALL_SEARCH_INTERNAL_TOKEN`）缺失时，
   `docker compose` 会直接报错并退出，不会静默使用空密码启动；
 - `MALL_SEARCH_INTERNAL_TOKEN` 在 mall-admin 与 mall-search 之间必须一致，
-  否则 `/esProduct/sync/**` 会返回 401/503，mall-admin 侧会跳过同步并打印 warn 日志。
+  否则 mall-search 六条写路径（`importAll`、`create/{id}`、`delete/{id}`、`delete/batch`、
+  `sync/{id}`、`sync/batch`）会返回 401（令牌缺失/错误）或 503（服务端未配置），
+  mall-admin 侧会跳过同步并打印 warn 日志；只读接口不受影响。
 
 ---
 
@@ -788,8 +791,19 @@ $env:SPRING_RABBITMQ_VIRTUAL_HOST   = "/mall"
 $env:SPRING_RABBITMQ_USERNAME       = "mall"
 $env:SPRING_RABBITMQ_PASSWORD       = "<RabbitMQ 密码>"
 $env:MALL_SEARCH_BASE_URL           = "http://localhost:8081"
+# 可选：MySQL 降级搜索开关，默认必须保持 false
+$env:MALL_SEARCH_MYSQL_FALLBACK_ENABLED = "false"
 mvn -pl mall-portal spring-boot:run
 ```
+
+降级开关说明：
+
+- `MALL_SEARCH_MYSQL_FALLBACK_ENABLED` 默认 `false`（关闭）；
+- 关闭时：mall-search 调用失败会把异常原样暴露，不静默查询 MySQL；
+- 开启时：只有 mall-search 客户端调用失败才降级到 MySQL 商品读查询，
+  不改变筛选条件与 1-based 分页契约，且**不具备 ES 相关度排序能力**
+  （`sort=0`、空值或非法值使用 `id desc` 稳定兜底排序）；
+- ES 正常时即使开关打开也不会查询 MySQL。
 
 `mall-portal` 的搜索链路保持不变：移动端访问 `/product/search`，由 mall-portal
 转发到 mall-search 的 `/esProduct/search`，**不要改成直接访问 8081**。
@@ -1033,15 +1047,16 @@ MINIO_PUBLIC_ENDPOINT=http://<LAN_IP>:9000
 ## 10. Elasticsearch 商品索引初始化（手工执行）
 
 商品索引 `pms` **不会自动创建**，需要在 `mall-search` 健康之后手工调用现有接口
-（`POST /esProduct/importAll`，不需要 Token）：
+（`POST /esProduct/importAll`，**需要 Token**）：
 
 ```powershell
 # 1) 确认 mall-search 已健康
 docker compose ps mall-search
 curl.exe http://localhost:8081/actuator/health
 
-# 2) 导入索引
-curl.exe -X POST http://localhost:8081/esProduct/importAll
+# 2) 导入索引（写接口，必须携带内部令牌）
+curl.exe -X POST http://localhost:8081/esProduct/importAll `
+  -H "X-Internal-Token: $env:MALL_SEARCH_INTERNAL_TOKEN"
 
 # 3) 检查索引
 curl.exe http://localhost:9200/_cat/indices?v
@@ -1051,10 +1066,27 @@ curl.exe http://localhost:9200/pms/_count
 补充：
 
 - 只导入 `delete_status = 0 and publish_status = 1` 的在售商品；
+- `importAll` 返回值含义：返回本次保留/导入的有效商品数量；
+  被剔除的陈旧文档数量只写入 mall-search 日志，不通过该返回值透出商品明细；
+- 导入成功后会清理陈旧文档：删除已下架、已删除、MySQL 中已不存在、
+  以及 ES 中存在但不属于当前有效集合的文档；
+  MySQL 查询异常或返回 null 时直接失败，**不会清空 ES**；
+  只有 MySQL 明确成功返回空集合时才允许清理全部陈旧文档；
+- 保存失败时**不继续清理陈旧文档**；但 `saveAll` 底层是 bulk，可能已部分写入成功，
+  因此保存失败不能保证 ES 完全没有变化，需再次执行 `importAll`（幂等）收敛；
+- 清理阶段按 `search_after` 游标分批遍历（每批 500 条，始终第 0 页），
+  不构造 `from + size` 深层分页，因此不受 `index.max_result_window`（默认 10000）限制；
+- 同一进程并发调用 `importAll` 会返回「正在执行中」提示，不会并发执行两个导入；
 - 没有执行 importAll 之前搜索结果为空，这是预期行为；
-- 后台商品新增 / 编辑 / 上下架 / 删除会通过事件同步到 ES，
-  同步接口 `/esProduct/sync/**` 需要请求头 `X-Internal-Token`，
+- 后台商品新增 / 编辑 / 上下架 / 删除会先更新 MySQL 并在事务提交后通过事件同步到 ES，
+  没有事务时事件不触发同步；
+  所有 mall-search 写接口都需要请求头 `X-Internal-Token`
+  （`importAll`、`create/{id}`、`delete/{id}`、`delete/batch`、`sync/{id}`、`sync/batch`），
   值来自 `MALL_SEARCH_INTERNAL_TOKEN`，mall-admin 与 mall-search 必须一致；
+  只读接口 `/esProduct/search`、`/esProduct/search/simple`、`/esProduct/search/relate`、
+  `/esProduct/recommend/{id}` 保持匿名可访问；
+- **当前不提供自动 outbox / MQ 补偿**：写 ES 失败时索引可能停留在旧状态，
+  需要重新调用同步接口或 `importAll` 修正；
 - 搜索验证（1-based 页码）：
 
 ```powershell
@@ -1257,7 +1289,8 @@ wsl -d docker-desktop sysctl -w vm.max_map_count=262144
   Spring Boot 环境变量优先级覆盖（`SERVER_PORT`、`SPRING_DATASOURCE_*`、
   `SPRING_DATA_REDIS_*`、`SPRING_RABBITMQ_*`、`SPRING_DATA_MONGODB_*`、
   `SPRING_ELASTICSEARCH_URIS`、`MINIO_*`、`MALL_SEARCH_BASE_URL`、
-  `MALL_SEARCH_INTERNAL_TOKEN`、`LOGSTASH_*`）；
+  `MALL_SEARCH_INTERNAL_TOKEN`、`MALL_SEARCH_MYSQL_FALLBACK_ENABLED`、
+  `LOGSTASH_*`）；
 - 新增文件只有编排配置、校验脚本与文档，历史配置
   `mall-master/document/docker/docker-compose-*.yml` 保持原样，
   未被引用也未被修改。

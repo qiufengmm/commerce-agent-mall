@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 /**
  * 商品索引同步事件监听器的触发时机测试
  * 用DataSourceTransactionManager加mock的Connection驱动真实的事务提交/回滚流程，
- * 只用TransactionSynchronizationManager验证提交后同步的时机，未连接真实MySQL
+ * 验证「只在提交后同步、无事务不同步、回滚不同步」，未连接真实MySQL
  */
 public class ProductSyncEventListenerTest {
 
@@ -99,29 +99,44 @@ public class ProductSyncEventListenerTest {
     }
 
     @Test
-    public void testSyncTriggeredImmediatelyWhenNoTransaction() {
+    public void testSyncNotTriggeredWhenNoTransaction() {
+        //没有事务时不再回退执行，事件不会触发任何同步，也不会抛出异常
         context.publishEvent(new ProductSyncEvent(Arrays.asList(1L, 2L)));
 
-        verify(config.syncService).syncBatch(Arrays.asList(1L, 2L));
+        verifyNoInteractions(config.syncService);
     }
 
     @Test
-    public void testSingleIdEventTriggeredWithSingleSync() {
+    public void testSingleIdEventTriggeredWithSingleSyncAfterCommit() {
+        TransactionStatus status = transactionManager.getTransaction(new DefaultTransactionDefinition());
+
         context.publishEvent(new ProductSyncEvent(Collections.singletonList(7L)));
+
+        verifyNoInteractions(config.syncService);
+
+        transactionManager.commit(status);
 
         verify(config.syncService).sync(7L);
     }
 
     @Test
     public void testEmptyEventNotTriggerSync() {
+        TransactionStatus status = transactionManager.getTransaction(new DefaultTransactionDefinition());
+
         context.publishEvent(new ProductSyncEvent(Collections.emptyList()));
+
+        transactionManager.commit(status);
 
         verifyNoInteractions(config.syncService);
     }
 
     @Test
     public void testDuplicateIdsTriggerOnceWithDistinctIds() {
+        TransactionStatus status = transactionManager.getTransaction(new DefaultTransactionDefinition());
+
         context.publishEvent(new ProductSyncEvent(Arrays.asList(1L, 1L, 2L, null)));
+
+        transactionManager.commit(status);
 
         verify(config.syncService).syncBatch(Arrays.asList(1L, 2L));
     }

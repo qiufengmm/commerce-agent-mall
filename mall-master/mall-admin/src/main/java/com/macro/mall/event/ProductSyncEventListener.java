@@ -12,7 +12,9 @@ import java.util.List;
 
 /**
  * 商品索引同步事件监听器
- * 有事务时在MySQL事务成功提交后触发，没有事务时立即触发，保证搜索服务读到的是已提交数据
+ * 只在MySQL事务成功提交后触发（AFTER_COMMIT），没有事务时不会触发任何同步，
+ * 保证搜索服务读到的始终是已提交数据，也保证回滚后不会把未生效的数据写进ES。
+ * 因此所有发布ProductSyncEvent的生产方法都必须运行在Spring事务中。
  */
 @Component
 public class ProductSyncEventListener {
@@ -21,7 +23,7 @@ public class ProductSyncEventListener {
     @Autowired
     private EsProductSyncService esProductSyncService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProductChanged(ProductSyncEvent event) {
         if (event == null || event.isEmpty()) {
             return;

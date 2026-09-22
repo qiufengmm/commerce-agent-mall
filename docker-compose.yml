@@ -367,6 +367,10 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请设置 RABBITMQ_PASSWORD}
       # 门户只调用 /esProduct/search，不需要内部同步令牌
       MALL_SEARCH_BASE_URL: http://mall-search:8081
+      # 搜索服务调用失败时是否降级到MySQL查询，默认 false（关闭）。
+      # 关闭时搜索服务异常原样暴露给调用方；开启后才允许复用MySQL商品读查询，
+      # 该降级不具备ES相关度排序能力。
+      MALL_SEARCH_MYSQL_FALLBACK_ENABLED: ${MALL_SEARCH_MYSQL_FALLBACK_ENABLED:-false}
       LOGSTASH_HOST: ${LOGSTASH_HOST:-logstash}
       LOGSTASH_ENABLEINNERLOG: ${LOGSTASH_ENABLEINNERLOG:-false}
     ports:

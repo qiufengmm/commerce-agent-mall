@@ -8,6 +8,7 @@ import com.macro.mall.common.exception.ApiException;
 import com.macro.mall.mapper.*;
 import com.macro.mall.model.*;
 import com.macro.mall.portal.client.MallSearchClient;
+import com.macro.mall.portal.config.MallSearchClientProperties;
 import com.macro.mall.portal.dao.PortalProductDao;
 import com.macro.mall.portal.domain.EsProductDTO;
 import com.macro.mall.portal.domain.PmsPortalProductDetail;
@@ -34,6 +35,11 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
      */
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 5;
+    /**
+     * MySQL兜底排序，sort为0、空值或非法值时使用，避免没有ORDER BY导致分页结果不稳定。
+     * 该排序只保证结果稳定，不代表ES相关度排序。
+     */
+    private static final String MYSQL_STABLE_ORDER_BY = "id desc";
     @Autowired
     private PmsProductMapper productMapper;
     @Autowired
@@ -54,6 +60,8 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
     private PortalProductDao portalProductDao;
     @Autowired
     private MallSearchClient mallSearchClient;
+    @Autowired
+    private MallSearchClientProperties mallSearchClientProperties;
 
     @Override
     public CommonPage<PmsProduct> search(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize, Integer sort) {
@@ -64,7 +72,18 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
             LOGGER.debug("开始查询商品，参数: keyword={}, brandId={}, productCategoryId={}, pageNum={}, pageSize={}, sort={}",
                     keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
         }
-        CommonPage<EsProductDTO> esProductPage = mallSearchClient.searchProduct(keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
+        CommonPage<EsProductDTO> esProductPage;
+        try {
+            esProductPage = mallSearchClient.searchProduct(keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
+        } catch (ApiException e) {
+            //只捕获搜索服务客户端调用失败，其它异常不属于降级范围，继续向上暴露
+            if (!mallSearchClientProperties.isMysqlFallbackEnabled()) {
+                throw e;
+            }
+            LOGGER.warn("搜索服务调用失败，已按配置降级到MySQL查询，keyword:{}, brandId:{}, productCategoryId:{}, 原因:{}",
+                    keyword, brandId, productCategoryId, e.getMessage());
+            return searchByMySqlWithFallbackPage(keyword, brandId, productCategoryId, currentPageNum, currentPageSize, sort);
+        }
         List<PmsProduct> productList = CollUtil.isEmpty(esProductPage.getList())
                 ? Collections.emptyList()
                 : esProductPage.getList().stream().map(this::convertEsProduct).collect(Collectors.toList());
@@ -88,11 +107,41 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
     }
 
     /**
-     * 原有 MySQL 综合搜索实现，保留用于后续降级方案，当前不在主链路调用
+     * 降级到MySQL查询时把MySQL结果包装成对外一致的1-based分页结构
+     */
+    private CommonPage<PmsProduct> searchByMySqlWithFallbackPage(String keyword, Long brandId, Long productCategoryId,
+                                                                int pageNum, int pageSize, Integer sort) {
+        List<PmsProduct> productList = searchByMySql(keyword, brandId, productCategoryId, pageNum, pageSize, sort);
+        CommonPage<PmsProduct> result = new CommonPage<>();
+        result.setPageNum(pageNum);
+        result.setPageSize(pageSize);
+        long total = resolveMySqlTotal(productList);
+        result.setTotal(total);
+        result.setTotalPage((int) Math.ceil((double) total / pageSize));
+        result.setList(productList);
+        LOGGER.info("MySQL降级查询完成，返回数量:{}，总数:{}", productList.size(), total);
+        return result;
+    }
+
+    /**
+     * PageHelper执行分页查询时返回的是com.github.pagehelper.Page，可读取真实总数；
+     * 非分页场景按返回条数统计，保证降级结果仍然提供total、totalPage、pageNum、pageSize
+     */
+    private long resolveMySqlTotal(List<PmsProduct> productList) {
+        if (productList instanceof com.github.pagehelper.Page<?> page) {
+            return page.getTotal();
+        }
+        return productList.size();
+    }
+
+    /**
+     * 原有 MySQL 综合搜索实现，作为降级方案使用，筛选条件与ES链路保持一致
      */
     @Override
     public List<PmsProduct> searchByMySql(String keyword, Long brandId, Long productCategoryId, Integer pageNum, Integer pageSize, Integer sort) {
-        PageHelper.startPage(pageNum, pageSize);
+        int currentPageNum = pageNum == null || pageNum < DEFAULT_PAGE_NUM ? DEFAULT_PAGE_NUM : pageNum;
+        int currentPageSize = pageSize == null || pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
+        PageHelper.startPage(currentPageNum, currentPageSize);
         PmsProductExample example = new PmsProductExample();
         PmsProductExample.Criteria criteria = example.createCriteria();
         criteria.andDeleteStatusEqualTo(0);
@@ -106,15 +155,20 @@ public class PmsPortalProductServiceImpl implements PmsPortalProductService {
         if (productCategoryId != null) {
             criteria.andProductCategoryIdEqualTo(productCategoryId);
         }
+        //sort为空时按0处理，避免空值参与比较时抛出异常
+        int currentSort = sort == null ? 0 : sort;
         //1->按新品；2->按销量；3->价格从低到高；4->价格从高到低
-        if (sort == 1) {
+        if (currentSort == 1) {
             example.setOrderByClause("id desc");
-        } else if (sort == 2) {
+        } else if (currentSort == 2) {
             example.setOrderByClause("sale desc");
-        } else if (sort == 3) {
+        } else if (currentSort == 3) {
             example.setOrderByClause("price asc");
-        } else if (sort == 4) {
+        } else if (currentSort == 4) {
             example.setOrderByClause("price desc");
+        } else {
+            //sort为0、空值或非法值时必须有稳定的ORDER BY，避免没有排序导致分页结果重复或缺失
+            example.setOrderByClause(MYSQL_STABLE_ORDER_BY);
         }
         return productMapper.selectByExample(example);
     }

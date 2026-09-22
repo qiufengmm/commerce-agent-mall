@@ -23,7 +23,9 @@ docker compose --env-file .env ps
 
 - 任何 SQL 的 `INSERT / UPDATE / DELETE / DDL`、权限修改、数据迁移；
 - 注册新账号、创建订单、支付、取消订单、确认收货、上传或删除文件；
-- 调用 `POST /esProduct/importAll`、`POST /esProduct/sync/**` 等会改变现有 ES 数据的接口；
+- 调用以下会改变现有 ES 数据的写接口：
+  `POST /esProduct/importAll`、`POST /esProduct/create/{id}`、`GET /esProduct/delete/{id}`、
+  `POST /esProduct/delete/batch`、`POST /esProduct/sync/{id}`、`POST /esProduct/sync/batch`；
 - MinIO 的上传、删除、策略修改；
 - 任何写入型接口压测。
 
@@ -86,7 +88,19 @@ curl.exe "http://localhost:8085/product/search?pageNum=1&pageSize=5"
 
 - `data.list` 为 `null` → 搜索服务异常，继续第 6 节确认 ES 状态；
 - 报 `Connection refused` 到 8081 → `MALL_SEARCH_BASE_URL` 配置错误；
-- 返回 500 → 查看 `docker compose logs mall-local-mall-search-1`。
+- 返回 500 → 查看 `docker compose logs mall-local-mall-search-1`；
+- 返回 500 且日志提示搜索服务不可用 → 当前环境 `MALL_SEARCH_MYSQL_FALLBACK_ENABLED` 为默认 `false`，
+  异常原样暴露属于预期；**不要为了看结果而开启降级开关**，降级只用于后续单独治理的容量场景。
+
+降级开关的只读确认（不触发任何写入）：
+
+```powershell
+# Compose 中 mall-portal 的实际取值，默认应为 false
+docker compose --env-file .env exec mall-portal printenv MALL_SEARCH_MYSQL_FALLBACK_ENABLED
+```
+
+期望输出为 `false`。若为 `true`，说明有人显式开启了 MySQL 降级，需要确认是否符合当前验证目的。
+降级链路不具备 ES 相关度排序能力，`sort=0`、空值或非法值时使用 `id desc` 稳定兜底排序。
 
 ## 6. Elasticsearch 只读检查
 
@@ -104,7 +118,9 @@ curl.exe "http://localhost:9200/pms/_search?size=1"
 - `pms/_count` 返回 `count` 大于 0（说明已完成过索引初始化）；
 - `pms/_search?size=1` 返回一条样例文档，不产生任何写入。
 
-搜索服务直连验证（`X-Internal-Token` 只用于 `/esProduct/sync/**` 同步接口，搜索接口不需要）：
+搜索服务直连验证（`X-Internal-Token` 只用于 mall-search 写接口，即 `importAll`、`create/{id}`、
+`delete/{id}`、`delete/batch`、`sync/{id}`、`sync/batch`；`search`、`search/simple`、`search/relate`、
+`recommend/{id}` 等只读接口保持匿名可访问，不需要令牌）：
 
 ```powershell
 curl.exe "http://localhost:8081/esProduct/search?keyword=&pageNum=1&pageSize=5"
@@ -158,6 +174,27 @@ mvn -pl mall-admin,mall-search,mall-portal -am test -DskipTests=false "-Dsurefir
 ```powershell
 mvn -pl mall-portal test -DskipTests=false "-Dtest=UmsMemberControllerTest,OmsCartItemControllerTest,OmsPortalOrderControllerTest,PmsPortalCommentControllerTest,UmsMemberServiceImplTest,OmsCartItemServiceImplTest,PmsPortalCommentServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false"
 mvn -pl mall-search test -DskipTests=false "-Dtest=EsProductControllerSearchTest,EsProductServiceImplSearchTest" "-Dsurefire.failIfNoSpecifiedTests=false"
+```
+
+ES 遗留项治理轮次（`es-legacy-hardening`）新增的测试类，全部使用 Mockito 测试替身，
+**不调用任何真实 ES 写接口**（`importAll` / `create` / `delete` / `sync`）：
+
+```powershell
+Set-Location F:\code\mall\.worktrees\es-legacy-hardening-latest\mall-master
+
+mvn -pl mall-admin  test -DskipTests=false "-Dtest=PmsProductStatusTransactionTest" "-Dsurefire.failIfNoSpecifiedTests=false"
+mvn -pl mall-search test -DskipTests=false "-Dtest=EsProductServiceImplImportAllTest,EsProductWriteEndpointSecurityTest,InternalTokenAuthFilterTest" "-Dsurefire.failIfNoSpecifiedTests=false"
+mvn -pl mall-portal test -DskipTests=false "-Dtest=PmsPortalProductFallbackTest" "-Dsurefire.failIfNoSpecifiedTests=false"
+```
+
+该轮次**不使用** `maven.test.failure.ignore`：任何测试失败都必须直接暴露并先修复，
+不允许用该参数把失败伪装成通过。整轮回归按下面顺序执行：
+
+```powershell
+mvn -pl mall-admin  -am test -DskipTests=false
+mvn -pl mall-search -am test -DskipTests=false
+mvn -pl mall-portal -am test -DskipTests=false
+mvn test -DskipTests=false
 ```
 
 前端：

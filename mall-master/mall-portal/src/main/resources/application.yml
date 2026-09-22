@@ -87,5 +87,8 @@ mall:
     connect-timeout-millis: 3000
     # 读取超时时间(毫秒)
     read-timeout-millis: 5000
+    # 搜索服务调用失败时是否降级到MySQL查询，默认false（关闭）。
+    # 开启后仅复用既有searchByMySql做商品读查询，不改变筛选条件、不改变1-based分页契约，也不具备ES相关度排序能力
+    mysql-fallback-enabled: ${MALL_SEARCH_MYSQL_FALLBACK_ENABLED:false}
     # 门户对外与 mall-search 已统一为 1-based 页码，页码原样透传，不再提供页码基准配置
 
