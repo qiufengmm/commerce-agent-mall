@@ -53,6 +53,16 @@
       </view>
     </view>
 
+    <!-- 智能导购入口 -->
+    <view class="agent-entry" @click="handleNavToAgentChatPage">
+      <view class="agent-entry__icon">AI</view>
+      <view class="agent-entry__main">
+        <text class="agent-entry__title">智能导购</text>
+        <text class="agent-entry__desc">按预算找商品、比较 2 至 3 件商品、查看 SKU 库存</text>
+      </view>
+      <text class="agent-entry__action">去提问</text>
+    </view>
+
     <!-- 品牌制造商直供 -->
     <view class="f-header m-t" @click="handleNavToRecommendBrandPage">
       <image src="/static/icon_home_brand.png"></image>
@@ -383,6 +393,13 @@ const handleNavToRecommendBrandPage = () => {
   })
 }
 
+// 跳转到智能导购页
+const handleNavToAgentChatPage = () => {
+  uni.navigateTo({
+    url: '/pages/agent/chat',
+  })
+}
+
 // 跳转到品牌详情页
 const handleNavToBrandDetailPage = (item: PmsBrand) => {
   uni.navigateTo({
@@ -682,6 +699,59 @@ page {
     border-radius: 50%;
     opacity: 0.7;
     box-shadow: 4rpx 4rpx 20rpx rgba(250, 67, 106, 0.3);
+  }
+}
+
+/* 智能导购入口 */
+.agent-entry {
+  display: flex;
+  align-items: center;
+  margin: 20rpx 22rpx;
+  padding: 24rpx 26rpx;
+  background: linear-gradient(135deg, #fff1f3, #ffffff);
+  border: 1rpx solid rgba(250, 67, 106, 0.18);
+  border-radius: 18rpx;
+  box-shadow: 0 4rpx 16rpx rgba(250, 67, 106, 0.08);
+
+  &__icon {
+    flex-shrink: 0;
+    width: 72rpx;
+    height: 72rpx;
+    font-size: 26rpx;
+    font-weight: 600;
+    line-height: 72rpx;
+    color: #fff;
+    text-align: center;
+    background: linear-gradient(135deg, #fa436a, #ff7f92);
+    border-radius: 50%;
+  }
+
+  &__main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    margin-left: 20rpx;
+  }
+
+  &__title {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: $font-color-dark;
+  }
+
+  &__desc {
+    margin-top: 6rpx;
+    font-size: 22rpx;
+    color: $font-color-base;
+  }
+
+  &__action {
+    flex-shrink: 0;
+    padding: 10rpx 22rpx;
+    font-size: 24rpx;
+    color: #fa436a;
+    border: 1rpx solid rgba(250, 67, 106, 0.4);
+    border-radius: 30rpx;
   }
 }
 

@@ -30,6 +30,14 @@ imgmigrate/mirror/
 imgmigrate/config.py
 imgmigrate/output/*backup*.sql
 imgmigrate/output/mall_after_migration.sql
-# Python 缓存
+# Python 缓存与虚拟环境
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+.hypothesis/

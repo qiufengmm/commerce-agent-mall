@@ -380,15 +380,24 @@ class StorefrontBackend(Protocol):
 - [ ] Compose `app` profile 新增 `mall-shopping-agent`：默认 `127.0.0.1:${AGENT_PORT:-8086}:8086`，依赖 `redis` 和 `mall-portal` healthy，配置第 12 节环境变量，健康检查和 `restart: unless-stopped`。
 - [ ] Nginx 新增 `/agent-api/` 到 `mall-shopping-agent:8086`，使用与现有代理一致的运行时 DNS；明确 `proxy_read_timeout 40s`，不开放流式缓冲特例。
 - [ ] `.env.example` 增加模型服务占位符、模型名、端口、TTL、轮数与 Stub 模式说明；真实 Key 不得提供示例值。
-- [ ] 保持现有 `check-env` 对五项基础凭据的行为和输出兼容；新增 agent 专用检查脚本，`openai` 模式下要求 base URL/model/key 非占位，`stub` 模式允许 Key 为空。两种脚本均检测重复定义且不输出变量值。
-- [ ] 添加脚本自测案例：openai 占位值退出 1、安全示例退出 0、重复定义退出 1、stub 无 Key 退出 0、输出不泄露测试值。
-- [ ] 运行静态验证：
+- [ ] 保持现有 `check-env` 对五项基础凭据的行为和输出兼容；新增 agent 专用检查脚本 `document/docker/check-agent-env.ps1` 与 `document/docker/check-agent-env.sh`：
+      `openai` 模式下要求 base URL、模型名和 Key 非占位，`stub` 模式允许 Key 为空；
+      两个脚本都要检测 `MALL_AGENT_MODEL_MODE`、`MALL_AGENT_OPENAI_BASE_URL`、`MALL_AGENT_OPENAI_MODEL`、
+      `MALL_AGENT_OPENAI_API_KEY`、`AGENT_PORT` 的重复定义（不得只取最后一个值），
+      并且只输出变量名、固定提示与失败原因，绝不输出变量值。
+- [ ] 脚本退出码语义固定为：`0` 校验通过、`1` 存在未通过项（占位值 / 缺失 / 非法地址 / 非法端口 / 非法模式 / 重复定义）、`2` 找不到 env 文件；
+      `check-agent-env` 不提供也不需要任何「忽略占位值」开关。
+- [ ] 添加脚本自测案例并记录退出码：`.env.example`（openai 占位配置）→ 1；`stub` + 空 Key → 0；
+      `openai` + 非占位本地测试 Key → 0；必检变量重复定义 → 1；env 文件不存在 → 2；输出不泄露测试值。
+      测试 Key 只能使用明显的本地占位值，不得使用真实凭据，报告也不得记录该值。
+- [ ] 运行静态验证（`.env.example` 只含占位值，因此两个校验脚本对它的预期结果都是退出码 1）：
 
   ```powershell
   docker compose --env-file .env.example config --quiet
   docker compose --env-file .env.example --profile app --profile edge --profile observability config --quiet
-  powershell -ExecutionPolicy Bypass -File document\docker\check-env.ps1 -EnvFile .env.example
-  powershell -ExecutionPolicy Bypass -File document\docker\check-agent-env.ps1 -EnvFile .env.example -AllowPlaceholderForConfigCheck
+  powershell -ExecutionPolicy Bypass -File document\docker\check-env.ps1 -EnvFile .env.example                 # 预期退出码 1
+  powershell -ExecutionPolicy Bypass -File document\docker\check-agent-env.ps1 -EnvFile .env.example           # 预期退出码 1
+  bash document/docker/check-agent-env.sh .env.example                                                          # 预期退出码 1
   bash -n document/docker/check-env.sh
   bash -n document/docker/check-agent-env.sh
   ```

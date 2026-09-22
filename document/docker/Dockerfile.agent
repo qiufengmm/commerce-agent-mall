@@ -1,0 +1,35 @@
+# =============================================================================
+# mall-shopping-agent 镜像（Python 3.11 + FastAPI）
+# =============================================================================
+# 构建上下文为 mall-shopping-agent/，本文件位于 document/docker/。
+# 该镜像只包含智能体服务本身：
+#   - 不安装 MySQL / MongoDB / RabbitMQ / Elasticsearch 客户端；
+#   - 不安装 curl 等额外系统包，健康检查只用 Python 标准库；
+#   - 不复制任何 .env、密钥或测试数据；
+#   - 运行期只通过 HTTP 调用 mall-portal 的只读接口。
+#
+# 基础镜像固定为 python:3.11-slim（Debian 系列，自带 python）。
+# =============================================================================
+
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TZ=Asia/Shanghai
+
+WORKDIR /app
+
+# 只复制运行所需的元数据与源码，不复制 tests / evals / .env / .venv
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+
+RUN pip install --no-cache-dir .
+
+EXPOSE 8086
+
+# 健康检查使用标准库，避免依赖 apt 安装 curl（受限网络下更稳、镜像更小）
+HEALTHCHECK --interval=15s --timeout=10s --start-period=30s --retries=10 \
+    CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8086/health/live', timeout=5).status == 200 else 1)"]
+
+CMD ["python", "-m", "uvicorn", "mall_shopping_agent.main:app", "--host", "0.0.0.0", "--port", "8086"]

@@ -404,13 +404,70 @@ services:
       - mall-net
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # app profile：商品导购智能体（Python 3.11 + FastAPI，只读）
+  # ---------------------------------------------------------------------------
+  # 只通过 HTTP 调用 mall-portal 的五个只读接口，不直连 MySQL / MongoDB /
+  # RabbitMQ / Elasticsearch，也不执行任何 SQL；会话与限流状态放在 Redis。
+  # 安全约定：
+  #   1. 不挂载根 .env，只注入 MALL_AGENT_* 白名单变量，
+  #      避免把基础设施凭据带进 agent 容器；
+  #   2. 模型凭据只来自 .env，占位值会被服务端与环境校验脚本拒绝；
+  #   3. 宿主机端口默认只绑定 127.0.0.1。
+  mall-shopping-agent:
+    profiles: ["app"]
+    image: ${AGENT_IMAGE:-mall-local/mall-shopping-agent:local}
+    build:
+      context: ./mall-shopping-agent
+      dockerfile: ../document/docker/Dockerfile.agent
+    environment:
+      TZ: Asia/Shanghai
+      MALL_AGENT_HOST: "0.0.0.0"
+      MALL_AGENT_PORT: "8086"
+      MALL_AGENT_LOG_LEVEL: ${MALL_AGENT_LOG_LEVEL:-INFO}
+      # openai（默认，需要真实 Key）或 stub（无 Key 离线演示）
+      MALL_AGENT_MODEL_MODE: ${MALL_AGENT_MODEL_MODE:-openai}
+      MALL_AGENT_OPENAI_BASE_URL: ${MALL_AGENT_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      MALL_AGENT_OPENAI_MODEL: ${MALL_AGENT_OPENAI_MODEL:-gpt-4o-mini}
+      # 允许为空：为空时聊天接口返回 503，不会让模型凭空回答商品事实
+      MALL_AGENT_OPENAI_API_KEY: ${MALL_AGENT_OPENAI_API_KEY:-}
+      MALL_AGENT_OPENAI_TIMEOUT_SECONDS: "30"
+      MALL_AGENT_REQUEST_TIMEOUT_SECONDS: "35"
+      MALL_AGENT_MAX_TOOL_ROUNDS: "4"
+      MALL_AGENT_SESSION_TTL_SECONDS: ${MALL_AGENT_SESSION_TTL_SECONDS:-86400}
+      MALL_AGENT_PORTAL_BASE_URL: http://mall-portal:8085
+      MALL_AGENT_REDIS_URL: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:${AGENT_PORT:-8086}:8086"
+    depends_on:
+      redis:
+        condition: service_healthy
+      # 只读调用 mall-portal，因此等待其健康后再启动
+      mall-portal:
+        condition: service_healthy
+    healthcheck:
+      # 使用 Python 标准库探测存活接口，镜像内不需要额外安装 curl
+      test:
+        - CMD
+        - python
+        - -c
+        - import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8086/health/live', timeout=5).status == 200 else 1)
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - mall-net
+    restart: unless-stopped
+
   # ===========================================================================
   # edge profile：Nginx 边缘代理
   # ===========================================================================
-  # 挂载已构建好的前端静态产物，并反向代理三个后端服务：
+  # 挂载已构建好的前端静态产物，并反向代理四个后端服务：
   #   /admin-api/  -> mall-admin:8080
   #   /portal-api/ -> mall-portal:8085
   #   /es-api/     -> mall-search:8081
+  #   /agent-api/  -> mall-shopping-agent:8086
   # 未构建前端产物时目录为空，页面会 404，构建命令见 document/docker/local-startup.md。
   nginx:
     profiles: ["edge"]

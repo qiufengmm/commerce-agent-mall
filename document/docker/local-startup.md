@@ -166,7 +166,7 @@ document/docker/logstash/pipeline/logstash.conf  Logstash 管道配置
 默认会占用以下宿主机端口，启动前先确认没有冲突：
 
 ```powershell
-$ports = 3306, 6379, 5672, 15672, 27017, 9200, 9000, 9001, 8080, 8081, 8085, 8088, 5601, 4560, 4561, 4562, 4563
+$ports = 3306, 6379, 5672, 15672, 27017, 9200, 9000, 9001, 8080, 8081, 8085, 8086, 8088, 5601, 4560, 4561, 4562, 4563
 foreach ($p in $ports) {
     $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
     if ($c) { Write-Output "PORT $p 已被占用 -> PID $($c.OwningProcess)" }
@@ -184,6 +184,7 @@ foreach ($p in $ports) {
 | 9200 | Elasticsearch | 默认基础设施 |
 | 9000 / 9001 | MinIO API / 控制台 | 默认基础设施 |
 | 8080 / 8081 / 8085 | mall-admin / mall-search / mall-portal | `app` profile |
+| 8086 | mall-shopping-agent | `app` profile |
 | 8088 | Nginx | `edge` profile |
 | 5601 | Kibana | `observability` profile |
 | 4560-4563 | Logstash TCP 输入 | `observability` profile |
@@ -264,6 +265,7 @@ docker compose --profile edge up -d
 | Nginx | `nginx:1.27-alpine` |
 | Logstash | `docker.elastic.co/logstash/logstash:8.18.3` |
 | Kibana | `docker.elastic.co/kibana/kibana:8.18.8` |
+| 商品导购智能体 | `python:3.11-slim`（固定，本地源码构建为 `mall-local/mall-shopping-agent:local`） |
 
 ### 2.1 镜像标签拉取验证状态
 
@@ -477,7 +479,7 @@ bash document/docker/check-env.sh
 | profile | 是否默认 | 包含服务 |
 | --- | --- | --- |
 | `infra` | **默认分组，不需要 `--profile`** | `mysql`、`redis`、`rabbitmq`、`mongo`、`elasticsearch`、`minio`、`minio-init` |
-| `app` | 需 `--profile app` | `mall-admin`、`mall-search`、`mall-portal` |
+| `app` | 需 `--profile app` | `mall-admin`、`mall-search`、`mall-portal`、`mall-shopping-agent` |
 | `edge` | 需 `--profile edge` | `nginx` |
 | `observability` | 需 `--profile observability` | `logstash`、`kibana` |
 
@@ -694,6 +696,64 @@ Logstash 的 9600 API 默认只在容器内监听，宿主机以 `docker inspect
    `$env:LOGSTASH_HOST = "localhost"` 与 `$env:LOGSTASH_ENABLEINNERLOG = "true"`。
 
 日志文件不含密码、Token 或密钥；Logstash / Kibana 配置中同样不写入任何凭据。
+
+### 4.7 商品导购智能体（`app` profile）
+
+```powershell
+docker compose --profile app build mall-shopping-agent   # 首次需要构建
+docker compose --profile app up -d mall-shopping-agent
+```
+
+- 服务名 `mall-shopping-agent`，容器端口 `8086`，宿主机映射 `127.0.0.1:8086:8086`；
+- 只读访问 `mall-portal`（`http://mall-portal:8085`），会话与限流状态存放在 Redis
+  （`redis://redis:6379/0`），**不直连 MySQL / MongoDB / RabbitMQ / Elasticsearch**；
+- `depends_on` 为 `redis`（healthy）与 `mall-portal`（healthy），不存在依赖环；
+- Compose **不挂载根 `.env`**，只注入 `MALL_AGENT_*` 白名单变量，
+  避免把数据库与中间件凭据带进 agent 容器；
+- 模型模式由 `MALL_AGENT_MODEL_MODE` 控制：`openai`（默认，需要真实 Key）或
+  `stub`（离线演示，不需要 Key）。占位 Key 会让聊天接口返回 503，不会被当成可用模型；
+- 启动前先执行智能体专用的环境校验：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File document\docker\check-agent-env.ps1
+```
+
+退出码：`0` 通过、`1` 存在未通过项、`2` 找不到 `.env`。
+脚本只输出变量名与失败原因，不输出任何变量值。
+
+验证：
+
+```powershell
+curl.exe http://localhost:8086/health/live
+curl.exe http://localhost:8086/health/ready
+curl.exe http://localhost:8086/agent/chat -X POST -H "content-type: application/json" `
+  -d '{\"sessionId\":\"2dc7b03e-7368-4d6a-a8ef-b0ea16f6c92c\",\"message\":\"推荐一下手机\"}'
+```
+
+`/health/ready` 需要 Redis 与 `mall-portal` 都可达；模型 Key 缺失不影响就绪，
+只影响 `/agent/chat`（返回 503）。
+
+Nginx（`edge` profile）通过 `/agent-api/` 反向代理到本服务：
+
+```text
+http://localhost:8088/agent-api/health/live
+http://localhost:8088/agent-api/agent/chat
+```
+
+移动端构建时把 `VITE_AGENT_API_BASE_URL` 设为 `/agent-api` 走 Nginx，
+或设为 `http://localhost:8086` 直连本服务。
+
+Redis 会话清理（只删除 `mall:agent:` 前缀的键）：
+
+```powershell
+docker exec mall-local-redis-1 redis-cli -n 0 --scan --pattern "mall:agent:*"
+docker exec mall-local-redis-1 redis-cli -n 0 del "<key>"
+```
+
+会话语义：会话 24 小时过期且每次有效访问续期，最多保留最近 20 条消息；
+游客与会话使用 `mall:agent:session:guest:<sessionId>`，
+登录会员使用 `mall:agent:session:member:<memberId>:<sessionId>`，
+持有有效 Token 时游客会话会迁移到会员命名空间并删除游客键。
 
 ---
 

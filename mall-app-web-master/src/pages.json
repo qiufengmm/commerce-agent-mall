@@ -101,6 +101,13 @@
       }
     },
     {
+      "path": "pages/agent/chat",
+      "style": {
+        "navigationBarTitleText": "智能导购",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/set/set",
       "style": {
         "navigationBarTitleText": "设置"

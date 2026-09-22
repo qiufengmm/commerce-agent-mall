@@ -37,7 +37,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
+import { goBackOrHome, navigateAfterLogin } from '@/utils/navigation'
 
 // 获取会员store
 const memberStore = useMemberStore()
@@ -48,6 +50,13 @@ const username = ref(uni.getStorageSync('username') || '')
 const password = ref(uni.getStorageSync('password') || '')
 // 登录加载状态
 const logining = ref(false)
+// 内部回跳路径，只接受白名单内的项目内页面，由 navigation 工具校验
+const redirect = ref<unknown>(undefined)
+
+// 读取回跳参数，不直接执行用户提供的地址
+onLoad((options) => {
+  redirect.value = options?.redirect
+})
 
 // 登录处理
 const toLogin = async () => {
@@ -70,11 +79,9 @@ const toLogin = async () => {
     })
 
     setTimeout(() => {
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack()
-      } else {
-        uni.switchTab({ url: '/pages/index/index' })
+      // 优先回到白名单内的目标页（例如智能导购页），否则保持原有返回逻辑
+      if (!navigateAfterLogin(redirect.value)) {
+        goBackOrHome()
       }
     }, 1000)
   } catch (error) {

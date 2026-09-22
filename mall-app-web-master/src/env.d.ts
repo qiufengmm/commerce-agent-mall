@@ -7,6 +7,11 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
   /** MinIO 公开访问地址，用于重写后端返回的内部图片地址 */
   readonly VITE_MINIO_PUBLIC_ENDPOINT?: string
+  /**
+   * 商品导购智能体基础地址
+   * H5 开发：http://localhost:8086；Nginx 环境：/agent-api
+   */
+  readonly VITE_AGENT_API_BASE_URL?: string
 }
 
 interface ImportMeta {

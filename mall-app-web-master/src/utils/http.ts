@@ -12,6 +12,11 @@ const baseURL = import.meta.env.VITE_API_BASE_URL
 
 const httpInterceptor = {
   invoke(options: UniApp.RequestOptions) {
+    // 智能体请求使用独立服务地址与超时（见 utils/agentHttp.ts），
+    // 因此跳过门户基础地址、超时和 source-client 改写
+    if ((options as UniApp.RequestOptions & { skipPortalInterceptor?: boolean }).skipPortalInterceptor) {
+      return
+    }
     // 1.拼接基础地址
     if (!options.url.startsWith('http')) {
       options.url = baseURL + options.url

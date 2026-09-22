@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mall-shopping-agent"
+version = "0.1.0"
+description = "Mall 商品导购智能体（只读工具调用，不包含任何交易写操作）"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.52.3",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.15.0",
+    "httpx==0.28.1",
+    "redis==8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.8",
+    # 仅用于静态解析 docker-compose.yml 的结构断言，不进运行镜像
+    "pyyaml==6.0.3",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mall_shopping_agent*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+filterwarnings = ["error::DeprecationWarning:mall_shopping_agent.*"]
+markers = [
+    "integration: 需要本地 Redis 或 mall-portal 的集成测试，未设置环境变量时跳过",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "evals"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"evals/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
