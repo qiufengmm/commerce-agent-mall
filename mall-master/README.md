@@ -81,7 +81,11 @@ mvn clean package -DskipTests
 
 - `MALL_SEARCH_INTERNAL_TOKEN` 需要在 mall-admin 与 mall-search 配置成同一个值，仓库内不保存真实令牌；
 - 三个服务的 `application.yml` 都不含数据库连接信息，本地启动请通过启动参数或环境变量注入；
-- 未配置令牌时 mall-search 同步接口返回 503，不会静默放行。
+- mall-search 的六条 ES 写路径（`importAll`、`create/{id}`、`delete/{id}`、
+  `delete/batch`、`sync/{id}`、`sync/batch`）统一要求请求头 `X-Internal-Token`；
+  未配置服务端令牌时返回 503，令牌缺失或错误时返回 401，不会静默放行。
+- 只读搜索接口（`search`、`search/simple`、`search/relate`、`recommend/{id}`）保持匿名访问，
+  不需要该内部令牌。
 
 ## 后续改造计划
 
