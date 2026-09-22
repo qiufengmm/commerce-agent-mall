@@ -1,0 +1,49 @@
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "pageNum": 1,
+    "pageSize": 5,
+    "totalPage": 2,
+    "total": 7,
+    "list": [
+      {
+        "id": 26,
+        "productSn": "201808270026",
+        "brandId": 6,
+        "brandName": "示例品牌",
+        "productCategoryId": 19,
+        "productCategoryName": "手机通讯",
+        "pic": "http://localhost:9000/mall/example-26.jpg",
+        "name": "示例手机 A",
+        "subTitle": "示例副标题 A",
+        "keywords": "手机 示例",
+        "price": 1899.00,
+        "sale": 100,
+        "newStatus": 1,
+        "recommandStatus": 1,
+        "stock": 500,
+        "promotionType": 0,
+        "sort": 200
+      },
+      {
+        "id": 27,
+        "productSn": "201808270027",
+        "brandId": 6,
+        "brandName": "示例品牌",
+        "productCategoryId": 19,
+        "productCategoryName": "手机通讯",
+        "pic": "http://localhost:9000/mall/example-27.jpg",
+        "name": "示例手机 B",
+        "subTitle": "示例副标题 B",
+        "price": 2999.00,
+        "sale": 50,
+        "stock": 120
+      },
+      {
+        "id": 28,
+        "name": "示例手机 C"
+      }
+    ]
+  }
+}

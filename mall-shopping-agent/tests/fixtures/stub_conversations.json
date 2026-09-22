@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "note": "Stub 模式的确定性对话脚本，只用于离线演示与评测，不含任何真实模型响应或凭据。",
+  "conversations": [
+    {
+      "id": "keyword-search-phone",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_keyword_1",
+              "name": "searchProducts",
+              "arguments": {"keyword": "手机", "sort": 0, "pageNum": 1}
+            }
+          ]
+        },
+        {
+          "content": "我按关键词“手机”检索了商城在售商品，候选商品的名称、价格和库存均来自商城实时数据。\n[[MALL_PRODUCTS: 27, 26]]"
+        }
+      ]
+    },
+    {
+      "id": "brand-category-filter",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_brand_1",
+              "name": "searchProducts",
+              "arguments": {"brandId": 6, "productCategoryId": 19, "pageNum": 1}
+            }
+          ]
+        },
+        {
+          "content": "我按品牌和分类缩小了范围，以下是命中的候选商品。\n[[MALL_PRODUCTS: 27]]"
+        }
+      ]
+    },
+    {
+      "id": "budget-sort-ascending",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_budget_1",
+              "name": "searchProducts",
+              "arguments": {"keyword": "手机", "sort": 3, "pageNum": 1}
+            }
+          ]
+        },
+        {
+          "content": "我按价格从低到高整理了当前搜索结果，预算倾向只用于排序，不代表完整的价位区间检索。\n[[MALL_PRODUCTS: 26, 27]]"
+        }
+      ]
+    },
+    {
+      "id": "compare-two-products",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_compare_1",
+              "name": "compareProducts",
+              "arguments": {"productIds": [27, 26]}
+            }
+          ]
+        },
+        {
+          "content": "我按服务端返回的详情事实比较了这两款商品的价格与可售库存。\n[[MALL_PRODUCTS: 27, 26]]"
+        }
+      ]
+    },
+    {
+      "id": "sku-stock-detail",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_detail_1",
+              "name": "getProductDetail",
+              "arguments": {"productId": 27}
+            }
+          ]
+        },
+        {
+          "content": "这款商品的可售库存按各 SKU 的库存减锁定库存汇总，数据来自商城详情接口。\n[[MALL_PRODUCTS: 27]]"
+        }
+      ]
+    },
+    {
+      "id": "guest-coupon-requires-login",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_guest_coupon_1",
+              "name": "getMemberCouponsForProduct",
+              "arguments": {"productId": 27}
+            }
+          ]
+        },
+        {
+          "content": "查询个人优惠券需要先登录，登录后可以继续当前对话。"
+        }
+      ]
+    },
+    {
+      "id": "member-coupons-for-product",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_member_coupon_1",
+              "name": "getMemberCouponsForProduct",
+              "arguments": {"productId": 27}
+            }
+          ]
+        },
+        {
+          "content": "我按您已领取的未使用优惠券与适用于该商品的优惠券取了交集，结果如下。"
+        }
+      ]
+    },
+    {
+      "id": "missing-product-detail",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_missing_1",
+              "name": "getProductDetail",
+              "arguments": {"productId": 999999}
+            }
+          ]
+        },
+        {
+          "content": "商品详情接口没有返回该商品，可能是商品不存在或已下架，我不会补全任何商品字段。"
+        }
+      ]
+    },
+    {
+      "id": "injected-product-text",
+      "responses": [
+        {
+          "toolCalls": [
+            {
+              "id": "call_injection_1",
+              "name": "searchProducts",
+              "arguments": {"keyword": "手机", "pageNum": 1}
+            }
+          ]
+        },
+        {
+          "content": "候选商品的名称直接来自商城，其中可能包含不可信文本，我只把它当作数据展示。\n[[MALL_PRODUCTS: 29]]"
+        }
+      ]
+    }
+  ]
+}

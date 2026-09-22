@@ -1,0 +1,23 @@
+# 智能体镜像构建上下文忽略规则（不要提交任何本地环境或缓存）
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+
+# 测试、评测与报告不进入运行镜像
+tests/
+evals/
+.codebuddy/
+
+# 本地环境变量与敏感文件
+.env
+.env.*
+*.pem
+*.key

@@ -1,0 +1,15 @@
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 7,
+    "memberLevelId": 4,
+    "username": "demo-member",
+    "password": "$2a$10$placeholder-hash-must-be-ignored",
+    "nickname": "示例会员",
+    "icon": "http://localhost:9000/mall/avatar.png",
+    "status": 1,
+    "integration": 1200,
+    "growth": 800
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "product": {
+      "id": 27,
+      "brandId": 6,
+      "productCategoryId": 19,
+      "name": "示例手机 B",
+      "pic": "http://localhost:9000/mall/example-27.jpg",
+      "productSn": "201808270027",
+      "publishStatus": 1,
+      "deleteStatus": 0,
+      "sale": 50,
+      "price": 2999.00,
+      "subTitle": "示例副标题 B",
+      "stock": 120,
+      "promotionType": 0,
+      "brandName": "示例品牌",
+      "productCategoryName": "手机通讯",
+      "description": "这是用于测试的商品描述。"
+    },
+    "brand": {
+      "id": 6,
+      "name": "示例品牌"
+    },
+    "productAttributeList": [
+      {
+        "id": 101,
+        "productAttributeCategoryId": 8,
+        "name": "颜色"
+      },
+      {
+        "id": 102,
+        "productAttributeCategoryId": 8,
+        "name": "内存"
+      },
+      {
+        "id": 103,
+        "productAttributeCategoryId": 8,
+        "name": "没有取值的属性"
+      }
+    ],
+    "productAttributeValueList": [
+      {
+        "id": 501,
+        "productId": 27,
+        "productAttributeId": 101,
+        "value": "金色"
+      },
+      {
+        "id": 502,
+        "productId": 27,
+        "productAttributeId": 102,
+        "value": "8GB"
+      }
+    ],
+    "skuStockList": [
+      {
+        "id": 106,
+        "productId": 27,
+        "skuCode": "201808270027001",
+        "price": 2999.00,
+        "stock": 100,
+        "lockStock": 0,
+        "pic": "http://localhost:9000/mall/sku-106.jpg",
+        "sale": 20,
+        "spData": "[{\"key\":\"颜色\",\"value\":\"金色\"}]"
+      },
+      {
+        "id": 107,
+        "productId": 27,
+        "skuCode": "201808270027002",
+        "price": 3199.00,
+        "stock": 5,
+        "lockStock": 8,
+        "sale": 30,
+        "spData": "[{\"key\":\"颜色\",\"value\":\"银色\"}]"
+      },
+      {
+        "id": 108,
+        "productId": 27,
+        "skuCode": "201808270027003",
+        "price": 3299.00,
+        "stock": 12,
+        "lockStock": 0,
+        "sale": 0
+      }
+    ],
+    "couponList": [
+      {
+        "id": 55,
+        "type": 0,
+        "name": "满500减50",
+        "platform": 0,
+        "count": 100,
+        "amount": 50.00,
+        "perLimit": 1,
+        "minPoint": 500.00,
+        "startTime": "2024-01-01T00:00:00.000Z",
+        "endTime": "2030-01-01T00:00:00.000Z",
+        "useType": 0,
+        "note": "满500减50"
+      }
+    ]
+  }
+}
