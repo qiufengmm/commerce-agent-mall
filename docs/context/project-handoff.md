@@ -8,8 +8,8 @@
 
 - 项目根目录：`F:\code\mall`
 - 当前分支：`main`
-- `origin/main` 当前基线为 `b8c46b1 更新项目交接与剩余任务`；本轮交接文档收尾提交仅保存在本地，后续仍需用户明确确认后再 push。
-- `git worktree list` 当前仅保留 `F:\code\mall` 的 `main` worktree；已合并的 Elasticsearch 可靠性工作树、`feature/es-reliability-hardening` 分支、旧 ES `stash@{0}` 和 `feature/es-legacy-hardening` 均已清理；当前剩余 `stash@{0}` 是原主工作区备份。
+- 当前本地 `main` 提交为 `b75533b 合并 Python 商品导购智能体`，`origin/main` 仍为 `b8c46b1 更新项目交接与剩余任务`；本地领先远程 5 个提交，尚未 push，需用户明确确认后执行。
+- 已合并的 Elasticsearch 可靠性工作树、`feature/es-reliability-hardening` 分支、旧 ES `stash@{0}` 和 `feature/es-legacy-hardening` 均已清理；当前剩余 `stash@{0}` 是原主工作区备份。商品导购实现工作树已清理，设计 worktree 在本轮收尾后同步清理。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
 - 主工作区应保持干净；运行时 `.env`、数据库快照、Docker 数据卷和凭据不纳入 Git。
 
@@ -22,6 +22,7 @@
 4. 订单/支付/库存一致性：状态条件更新、支付归属/金额校验、库存保护、优惠券绑定和历史数据订正已完成。
 5. Docker 本地全栈环境：MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO、三个 Java 服务和 Nginx 已编排；MinIO 使用固定 Quay 镜像，应用构建跳过旧 Fabric8 Docker 插件，Nginx 代理与健康检查已修复。
 6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射、通知图片文件名兼容和真实 MinIO 对象访问均已验证；夸克手机最终复测正常，微信开发者工具图片验收也已完成。正式 HTTPS 合法域名仍留待后续环境配置。
+7. Python 商品导购智能体：独立 FastAPI 服务、OpenAI 兼容客户端、Redis 短期会话、只读商品/库存/优惠券工具、安全围栏、移动端聊天页、Docker Compose/Nginx 接入和 Stub 离线评测已合并；游客搜索/详情/库存的容器化只读链路已验证。真实模型、共享 Nginx `/agent-api/` 运行时代理和微信真机仍待环境具备后复测。
 
 ## Docker 验证基线
 
@@ -33,13 +34,15 @@
 - 本次冒烟未执行 SQL、注册、下单、支付、同步/导入、上传或删除；历史对象是否完整仍需以实际对象清单为准。
 - Elasticsearch 可靠性治理已完成并在本地 Compose 环境验证：Redis 锁、Logstash/Kibana 健康、六条写路径令牌拒绝、带令牌 `importAll`、`pms` 索引数量/映射和门户搜索均已验证；未执行真实 create/delete/sync 写请求。
 - 2026-09-22 已在隔离数据上完成真实注册、登录、收货地址、优惠券领取、直购下单和本地支付成功链路验证；首次支付正确扣减 SKU 库存并释放锁定库存，重复支付保持幂等。验收后已恢复 SKU 原值并删除测试会员、地址、订单、订单明细、优惠券及缓存，所有测试记录只读复核为 0。
+- 2026-09-22 商品导购智能体合并后复验：Python `344 passed, 6 skipped`，Ruff、Stub 评测 `10/10`，移动端 `95 passed`、TypeScript、H5/微信小程序构建和 Compose 两种 profile 配置均通过；本机无安全模型凭据，未执行 live 模型评测。
 - 启动步骤和 SQL 安全边界见 `document/docker/local-startup.md`；历史 `mall.sql` 不作为已有数据库的直接覆盖脚本。
 
 ## 当前剩余任务
 
-1. 配置正式 HTTPS、合法域名和微信小程序安全域名，替换当前局域网 HTTP 联调配置；当前按用户决定暂缓。
-2. 评估 ES 多实例 `importAll` 压力测试，以及 outbox/MQ 补偿机制。
-3. 设计第一版商品导购智能体，先限定为只读搜索、筛选、详情问答、库存和优惠券解释。
+1. 将当前本地 `main` 的 5 个领先提交推送到 `origin/main`；执行前必须取得用户对具体分支和远程的明确确认。
+2. 完成商品导购智能体真实环境验收：配置安全的 OpenAI 兼容服务后运行 live 评测，验证共享 Nginx `/agent-api/` 运行时代理，并在微信开发者工具/真机复测。
+3. 配置正式 HTTPS、合法域名和微信小程序安全域名，替换当前局域网 HTTP 联调配置；当前按用户决定暂缓。
+4. 评估 Elasticsearch 多实例 `importAll` 压力测试，以及 outbox/MQ 补偿机制。
 
 ## 新对话必须遵守
 

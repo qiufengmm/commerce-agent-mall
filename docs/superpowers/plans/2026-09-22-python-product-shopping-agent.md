@@ -10,6 +10,8 @@
 
 **Spec:** `document/agent/product-shopping-agent.md`
 
+> 执行状态（2026-09-22）：Task 1—11 的实现、测试和静态验收已完成；Task 12 的 Stub 容器化只读链路、自动化验收和文档已完成，并已合并到 `main`（实现提交 `19e0ed2`，合并提交 `b75533b`）。本机未配置安全的真实模型凭据，因此 live 模型评测、共享 Nginx `/agent-api/` 运行时代理和微信真机验证保留为后续环境验收，不视为代码阻塞。
+
 ## Global Constraints
 
 - 实现必须在从最新 `main` 创建的新 worktree 中进行，不得继续使用本设计 worktree。
@@ -461,3 +463,11 @@ class StorefrontBackend(Protocol):
 - [ ] Python 全测、Ruff、前端全测、TypeScript、H5/小程序构建、Compose/Nginx 检查全部通过。
 - [ ] 10 类 Stub 评测全部通过；真实模型结果与未验证项如实单列。
 - [ ] 无 SQL、无数据库结构变化、无真实密钥、无生成目录进入提交。
+
+## 收尾记录
+
+- [x] Python 服务、OpenAI 兼容客户端、Mall 门户只读 Backend、Redis 会话/限流、安全围栏、导购编排、FastAPI API、Stub 评测、移动端页面、Compose/Nginx 和环境校验已实现。
+- [x] 合并后 Python `344 passed, 6 skipped`，Ruff 通过，Stub 评测 `10/10`；移动端 `95 passed`、TypeScript、H5/微信小程序构建和 Compose 配置校验通过。
+- [x] 未执行 SQL、数据库写入、真实交易写操作或 ES 写接口；未提交真实密钥、Token、生成目录。
+- [ ] 配置安全的真实 OpenAI 兼容模型并运行 live 评测。
+- [ ] 在共享 Nginx 和微信开发者工具/真机环境完成最终运行时验收。

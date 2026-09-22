@@ -99,7 +99,7 @@
 - 当前基线：`mall-admin` 现有测试 49 个通过；`mall-search` 已执行 35 个测试，其中 3 个 Spring 上下文测试因开发 profile 默认数据源连接配置失败，不能据此宣称全套测试通过；`mall-portal` 因 Maven reactor 在 `mall-search` 失败后未执行。
 
 - [x] 后端自动化覆盖会员注册/登录、购物车、订单、评价等核心控制器与服务边界；新增 77 个 portal 用例，全部通过。
-- [x] ES 搜索分页和深分页边界已覆盖；新增 14 个 search 用例，全部通过。商品导入、同步和鉴权既有测试仍需结合在线环境清单继续核验。
+- [x] ES 搜索分页和深分页边界已覆盖；新增 14 个 search 用例，全部通过。商品导入、同步和鉴权已在可靠性治理及本地 Compose 清单中完成验证。
 - [x] 前端 Vitest 覆盖商品搜索、支付结果和相关关键交互；7 个测试文件、43 个用例通过，TypeScript 检查通过。
 - [x] 2026-09-20 启动 Docker 全 profile 后按清单完成真实只读 API 冒烟；Admin 使用 `.env` 的宿主机端口 18080，直连与 Nginx 代理健康检查均为 200/UP，门户/ES 搜索均为 200 且保持 1-based `pageNum=1`，ES green、`pms` 实时 `_count=20`，MinIO 健康与已知对象读取均为 200；未执行 SQL 或任何业务/同步写接口。
 - [x] 已记录基线失败和本轮失败，未用“测试通过”掩盖环境错误：`MallSearchApplicationTests` 3 个环境配置错误、`PortalProductDaoTests` 1 个 H2 表缺失错误，均为改动前基线。
@@ -107,7 +107,7 @@
 
 ---
 
-### Task 6: 移动端图片与真机联调（代码适配已完成，运行时联调待设备）
+### Task 6: 移动端图片与真机联调（已完成，正式 HTTPS 暂缓）
 
 **Files:**
 - `mall-app-web-master/src/` 中涉及图片基础地址的配置文件
@@ -125,46 +125,48 @@
 
 ---
 
-### Task 7: 第一版商品导购智能体
+### Task 7: 第一版商品导购智能体（已完成）
 
 **Files:**
 - New module/design only after Tasks 1–6 are stable。
 - Design doc: `document/agent/product-shopping-agent.md`
 
-- [ ] 先定义只读能力：商品搜索、筛选、详情问答、库存和优惠券解释。
-- [ ] 明确工具边界：智能体不能直接改订单、库存、支付或数据库；下单必须回到现有前端确认流程。
-- [ ] 设计商品搜索工具调用协议，复用 `/product/search`，不绕过门户服务。
-- [ ] 为敏感操作设计二次确认和审计日志，不在提示词中放密钥。
-- [ ] 先做离线评测集和 10 条典型对话，再决定模型和接口实现。
-- [ ] 独立提交：`设计第一版商品导购智能体`。
+- [x] 先定义只读能力：商品搜索、筛选、详情问答、库存和优惠券解释。
+- [x] 明确工具边界：智能体不能直接改订单、库存、支付或数据库；下单必须回到现有前端确认流程。
+- [x] 设计商品搜索工具调用协议，复用 `/product/search`，不绕过门户服务。
+- [x] 为敏感操作设计二次确认和审计日志，不在提示词中放密钥。
+- [x] 先做离线评测集和 10 条典型对话，再决定模型和接口实现。
+- [x] 设计提交：`b64668d 设计 Python 商品导购智能体`；实现提交：`19e0ed2`；合并提交：`b75533b`。
 
 ---
 
-### Task 8: 修复测试基线（新增，待执行）
+### Task 8: 修复测试基线（已完成）
 
 **Plan:** `docs/superpowers/plans/2026-09-21-test-baseline-repair.md`
 
-- [ ] 将 `mall-search` 旧的完整外部环境测试拆为默认隔离测试；外部集成测试必须显式运行。
-- [ ] 将 `PortalProductDaoTests` 改为可重复的 H2/MyBatis DAO 测试，不连接开发 MySQL。
-- [ ] 分模块运行默认测试并读取 Surefire 报告，不能用 failure-ignore 掩盖失败。
-- [ ] 生成 `test-baseline-repair-report.md`，主 Agent 完成 diff、敏感文件和测试审查。
+- [x] 将 `mall-search` 旧的完整外部环境测试拆为默认隔离测试；外部集成测试必须显式运行。
+- [x] 将 `PortalProductDaoTests` 改为可重复的 H2/MyBatis DAO 测试，不连接开发 MySQL。
+- [x] 分模块运行默认测试并读取 Surefire 报告，不能用 failure-ignore 掩盖失败。
+- [x] 生成 `test-baseline-repair-report.md`，主 Agent 完成 diff、敏感文件和测试审查。
 
 ---
 
-### Task 9: Elasticsearch 遗留项治理（新增，待执行）
+### Task 9: Elasticsearch 遗留项治理（已完成）
 
 **Plan:** `docs/superpowers/plans/2026-09-21-es-legacy-hardening.md`
 
-- [ ] 补齐商品上下架、推荐、新品、删除状态的事务边界和提交后事件测试。
-- [ ] 让全量导入清理陈旧 ES 文档，并验证数据源异常不误删。
-- [ ] 用内部 Token 保护 import/create/delete/sync 写接口，保留搜索读接口匿名访问。
-- [ ] 实现默认关闭、可配置启用的 MySQL 降级搜索及分页测试。
-- [ ] 生成 `es-legacy-hardening-report.md`，完成主 Agent 只读审查和模块测试。
+- [x] 补齐商品上下架、推荐、新品、删除状态的事务边界和提交后事件测试。
+- [x] 让全量导入清理陈旧 ES 文档，并验证数据源异常不误删。
+- [x] 用内部 Token 保护 import/create/delete/sync 写接口，保留搜索读接口匿名访问。
+- [x] 实现默认关闭、可配置启用的 MySQL 降级搜索及分页测试。
+- [x] 生成 `es-legacy-hardening-report.md`，完成主 Agent 只读审查和模块测试。
 
 ---
 
-## 当前执行顺序
+## 历史执行顺序（已完成）
 
 1. 修复默认测试基线并隔离外部集成测试。
 2. Elasticsearch 遗留项专项处理。
 3. 商品导购智能体设计与实现。
+
+后续以 `docs/context/project-handoff.md` 的当前剩余任务为准。
