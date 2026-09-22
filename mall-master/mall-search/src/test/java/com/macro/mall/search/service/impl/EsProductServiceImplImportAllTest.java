@@ -16,11 +16,13 @@ import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.BulkFailureException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -274,6 +276,54 @@ public class EsProductServiceImplImportAllTest {
     }
 
     @Test
+    public void testBulkFailureRetriesOnlyFailedProductsBeforeStaleCleanup() {
+        BulkFailureException failure = bulkFailure("2");
+        SearchHits<EsProduct> existingHits = searchHits(products(1L, 2L, 9L), 3L);
+        when(productDao.getAllEsProductList(isNull())).thenReturn(Arrays.asList(product(1L), product(2L)));
+        when(productRepository.saveAll(anyList())).thenThrow(failure).thenReturn(Collections.emptyList());
+        when(elasticsearchTemplate.search(any(NativeQuery.class), eq(EsProduct.class))).thenReturn(existingHits);
+
+        int result = esProductService.importAll();
+
+        assertEquals(2, result);
+        ArgumentCaptor<Iterable<EsProduct>> savedCaptor = savedProductsCaptor();
+        verify(productRepository, times(2)).saveAll(savedCaptor.capture());
+        assertEquals(Arrays.asList(1L, 2L), ids(savedCaptor.getAllValues().get(0)));
+        assertEquals(Collections.singletonList(2L), ids(savedCaptor.getAllValues().get(1)));
+        assertEquals(Collections.singletonList(9L), captureDeletedIds());
+    }
+
+    @Test
+    public void testBulkRetryFailureDoesNotDeleteStaleDocuments() {
+        BulkFailureException failure = bulkFailure("2");
+        SearchHits<EsProduct> existingHits = searchHits(products(1L, 2L, 9L), 3L);
+        when(productDao.getAllEsProductList(isNull())).thenReturn(Arrays.asList(product(1L), product(2L)));
+        when(productRepository.saveAll(anyList()))
+                .thenThrow(failure)
+                .thenThrow(new IllegalStateException("retry failed"));
+        when(elasticsearchTemplate.search(any(NativeQuery.class), eq(EsProduct.class))).thenReturn(existingHits);
+
+        assertThrows(IllegalStateException.class, () -> esProductService.importAll());
+
+        verify(productRepository, times(2)).saveAll(anyList());
+        verify(productRepository, never()).deleteAllById(any(Iterable.class));
+        verify(elasticsearchTemplate, never()).search(any(NativeQuery.class), eq(EsProduct.class));
+    }
+
+    @Test
+    public void testUnknownBulkFailureIdDoesNotAllowStaleCleanup() {
+        BulkFailureException failure = bulkFailure("999");
+        when(productDao.getAllEsProductList(isNull())).thenReturn(Collections.singletonList(product(1L)));
+        when(productRepository.saveAll(anyList())).thenThrow(failure);
+
+        assertThrows(BulkFailureException.class, () -> esProductService.importAll());
+
+        verify(productRepository, times(1)).saveAll(anyList());
+        verify(productRepository, never()).deleteAllById(any(Iterable.class));
+        verify(elasticsearchTemplate, never()).search(any(NativeQuery.class), eq(EsProduct.class));
+    }
+
+    @Test
     public void testConcurrentImportAllIsRejected() throws Exception {
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -318,6 +368,24 @@ public class EsProductServiceImplImportAllTest {
             savedIds.add(esProduct.getId());
         }
         return savedIds;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Iterable<EsProduct>> savedProductsCaptor() {
+        return (ArgumentCaptor<Iterable<EsProduct>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(Iterable.class);
+    }
+
+    private List<Long> ids(Iterable<EsProduct> products) {
+        List<Long> ids = new ArrayList<>();
+        for (EsProduct product : products) {
+            ids.add(product.getId());
+        }
+        return ids;
+    }
+
+    private BulkFailureException bulkFailure(String failedId) {
+        return new BulkFailureException("bulk failed",
+                Map.of(failedId, new BulkFailureException.FailureDetails(500, "simulated failure")));
     }
 
     private EsProduct product(Long id) {

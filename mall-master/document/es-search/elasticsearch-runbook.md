@@ -26,7 +26,7 @@ mall-admin 商品写操作（新增/编辑/上下架/推荐/新品/删除，均�
 | --- | --- | --- |
 | Elasticsearch | `localhost:9200` | 建议 8.x，需要安装 `analysis-ik` 分词插件 |
 | MySQL | `localhost:3306/mall` | 搜索服务从 MySQL 读取已上架商品 |
-| Redis | `localhost:6379` | 仅 mall-admin / mall-portal 需要 |
+| Redis | `localhost:6379` | mall-search 的 importAll 分布式锁，以及 mall-admin / mall-portal |
 | RabbitMQ | `localhost:5672` | 仅 mall-portal 订单场景需要 |
 
 服务端口：
@@ -72,6 +72,10 @@ curl http://localhost:9200/_cat/plugins?v
 | `MALL_ES_URIS` | mall-search 连接 Elasticsearch 的地址 | `localhost:9200` |
 | `MALL_SEARCH_BASE_URL` | mall-admin / mall-portal 访问 mall-search 的地址 | `http://localhost:8081` |
 | `MALL_SEARCH_INTERNAL_TOKEN` | 内部写接口令牌，mall-admin 与 mall-search 必须一致 | 空 |
+| `MALL_SEARCH_IMPORT_LOCK_ENABLED` | importAll 跨实例 Redis 互斥锁 | `true` |
+| `MALL_SEARCH_IMPORT_LOCK_KEY` | Redis 锁 key | `mall:search:import-all` |
+| `MALL_SEARCH_IMPORT_LOCK_LEASE_SECONDS` | 锁租约时长 | `1800` |
+| `MALL_SEARCH_IMPORT_LOCK_RENEW_INTERVAL_SECONDS` | 锁续租间隔 | `30` |
 | `MALL_SEARCH_MYSQL_FALLBACK_ENABLED` | 门户 MySQL 降级搜索开关 | `false` |
 
 ### 3.1 mall-search 写接口与内部令牌
@@ -185,10 +189,21 @@ MySQL 当前有效集合明确为 `delete_status = 0` 且 `publish_status = 1` �
 
 保存失败的准确语义（不要扩大描述）：
 
-- 保存调用底层是 Elasticsearch bulk，**可能部分文档已经写入成功**；本实现不做回滚或补偿，
-  因此保存抛异常时 **不能保证 ES index 完全没有变化**；
-- 保存失败后唯一保证的是：**不继续删除任何陈旧文档**，索引不会被清空；
+- 保存调用底层是 Elasticsearch bulk，**可能部分文档已经写入成功**；对明确出错的商品最多重试一次，
+  不做已成功文档的回滚补偿，因此保存抛异常时 **不能保证 ES index 完全没有变化**；
+- 无法解析失败商品、或失败商品重试仍失败时，**不继续删除任何陈旧文档**；
 - 已写入的部分由再次执行 `importAll` 收敛（该操作幂等），必要时配合只读 `pms/_count` 观察文档总量。
+
+### 5.4 importAll 跨实例互斥与失锁保护
+
+`importAll` 同时使用进程内锁和 Redis 锁。Redis 锁使用 `SET NX` 加租约，持有实例以 owner
+校验续租和释放，默认 key 为 `mall:search:import-all`，租约 1800 秒、每 30 秒续租一次。
+
+- Redis 不可用、锁已被其它实例持有或无法启动续租时，导入在读取 MySQL 前拒绝执行；
+- 运行过程中续租失败会进入 fail-closed 状态：允许已发生的写入保持原状，但不会继续扫描或删除陈旧 ES 文档；
+- `MALL_SEARCH_IMPORT_LOCK_ENABLED=false` 仅用于明确的本地单实例诊断，生产和多实例部署必须保持 `true`；
+- Compose 中 `mall-search` 等待 Redis 健康后才启动。Redis 锁只保护 `importAll`，不替代六条写接口的
+  `X-Internal-Token` 鉴权，也不改变搜索接口的 1-based 分页契约。
 
 遍历方式说明：清理阶段使用 `search_after` 游标分批（每批 500 条、始终 `from = 0`），
 不构造 `from + size` 深层分页请求，因此**不受 `index.max_result_window`（默认 10000）限制**，

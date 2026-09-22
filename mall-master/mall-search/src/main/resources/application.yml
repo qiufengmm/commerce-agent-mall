@@ -32,6 +32,12 @@ mall:
     # 单次批量同步商品id数量上限，请求id数量为空或超过该上限时返回400
     # 该值需与mall-admin的mall.search.max-sync-batch-size保持一致
     max-sync-batch-size: 100
+    # importAll 的跨实例 Redis 互斥锁。Redis 不可用或锁续租失败时拒绝继续清理陈旧 ES 文档。
+    import-lock:
+      enabled: ${MALL_SEARCH_IMPORT_LOCK_ENABLED:true}
+      key: ${MALL_SEARCH_IMPORT_LOCK_KEY:mall:search:import-all}
+      lease-seconds: ${MALL_SEARCH_IMPORT_LOCK_LEASE_SECONDS:1800}
+      renew-interval-seconds: ${MALL_SEARCH_IMPORT_LOCK_RENEW_INTERVAL_SECONDS:30}
 
 springdoc:
   swagger-ui:

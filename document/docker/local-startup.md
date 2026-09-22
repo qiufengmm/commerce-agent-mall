@@ -670,6 +670,19 @@ docker compose --profile observability up -d
 - Kibana：`http://localhost:5601`
 - Logstash TCP 输入：`4560`(debug) / `4561`(error) / `4562`(business) / `4563`(record)
 
+启动后用容器健康状态和 Kibana HTTP 接口确认实际运行结果：
+
+```powershell
+docker compose --profile observability ps logstash kibana
+docker inspect (docker compose ps -q logstash) --format 'logstash={{.State.Status}} health={{.State.Health.Status}}'
+docker inspect (docker compose ps -q kibana) --format 'kibana={{.State.Status}} health={{.State.Health.Status}}'
+curl.exe -sS -o NUL -w 'kibana_http=%{http_code}`n' http://127.0.0.1:5601/api/status
+```
+
+期望：Logstash、Kibana 均为 `running` 且健康检查为 `healthy`，Kibana HTTP 状态为 `200`。
+Logstash 的 9600 API 默认只在容器内监听，宿主机以 `docker inspect` 的健康状态为准；若不健康，
+先查看 `docker compose logs --tail=200 logstash`，不要把 `Exited (0)` 或旧容器状态当作本次启动成功。
+
 管道配置复制自 `mall-master/document/elk/logstash.conf`，仅把输出地址从
 `localhost:9200` 改为容器内的 `http://elasticsearch:9200`。
 
@@ -1072,11 +1085,12 @@ curl.exe http://localhost:9200/pms/_count
   以及 ES 中存在但不属于当前有效集合的文档；
   MySQL 查询异常或返回 null 时直接失败，**不会清空 ES**；
   只有 MySQL 明确成功返回空集合时才允许清理全部陈旧文档；
-- 保存失败时**不继续清理陈旧文档**；但 `saveAll` 底层是 bulk，可能已部分写入成功，
-  因此保存失败不能保证 ES 完全没有变化，需再次执行 `importAll`（幂等）收敛；
+- 保存时若 bulk 返回明确失败商品，最多只重试失败商品一次；bulk 可能已部分写入成功，
+  不做回滚补偿。无法识别失败商品或重试仍失败时**不继续清理陈旧文档**，需再次执行 `importAll`（幂等）收敛；
 - 清理阶段按 `search_after` 游标分批遍历（每批 500 条，始终第 0 页），
   不构造 `from + size` 深层分页，因此不受 `index.max_result_window`（默认 10000）限制；
-- 同一进程并发调用 `importAll` 会返回「正在执行中」提示，不会并发执行两个导入；
+- 同一进程并发调用 `importAll` 会返回「正在执行中」提示；跨实例还会使用 Redis 锁互斥，
+  Redis 不可用、锁冲突或续租失败时拒绝继续，失锁后不会清理陈旧文档；
 - 没有执行 importAll 之前搜索结果为空，这是预期行为；
 - 后台商品新增 / 编辑 / 上下架 / 删除会先更新 MySQL 并在事务提交后通过事件同步到 ES，
   没有事务时事件不触发同步；

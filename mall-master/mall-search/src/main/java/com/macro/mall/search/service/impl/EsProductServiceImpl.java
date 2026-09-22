@@ -12,6 +12,9 @@ import com.macro.mall.search.dao.EsProductDao;
 import com.macro.mall.search.domain.EsProduct;
 import com.macro.mall.search.domain.EsProductRelatedInfo;
 import com.macro.mall.search.exception.ImportAllConflictException;
+import com.macro.mall.search.lock.ImportAllLock;
+import com.macro.mall.search.lock.ImportAllLockException;
+import com.macro.mall.search.lock.ImportAllLockService;
 import com.macro.mall.search.repository.EsProductRepository;
 import com.macro.mall.search.service.EsProductService;
 import com.macro.mall.search.util.SearchPageUtils;
@@ -19,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
+import org.springframework.data.elasticsearch.BulkFailureException;
 import org.springframework.data.elasticsearch.client.elc.*;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -50,6 +54,11 @@ public class EsProductServiceImpl implements EsProductService {
     @Autowired
     private ElasticsearchTemplate elasticsearchTemplate;
     /**
+     * Redis跨实例互斥锁。手工构造服务的单元测试使用禁用实现，Spring运行时注入Redis实现。
+     */
+    @Autowired(required = false)
+    private ImportAllLockService importAllLockService = ImportAllLockService.disabled();
+    /**
      * 进程内互斥锁，保证同一实例的importAll不会并发执行
      */
     private final ReentrantLock importAllLock = new ReentrantLock();
@@ -65,7 +74,12 @@ public class EsProductServiceImpl implements EsProductService {
         if (!importAllLock.tryLock()) {
             throw new ImportAllConflictException("商品索引全量导入正在执行中，同一实例不支持并发执行");
         }
+        ImportAllLock distributedLock = null;
         try {
+            distributedLock = importAllLockService == null
+                    ? ImportAllLock.noop()
+                    : importAllLockService.tryAcquire();
+            requireDistributedLockHeld(distributedLock);
             //MySQL查询异常会直接向上抛出，不会走到保存和删除逻辑，MySQL异常时绝不改动ES索引
             List<EsProduct> esProductList = productDao.getAllEsProductList(null);
             if (esProductList == null) {
@@ -73,21 +87,71 @@ public class EsProductServiceImpl implements EsProductService {
                 throw new IllegalStateException("查询MySQL有效商品列表返回null，已中止全量导入，ES索引未被修改");
             }
             Map<Long, EsProduct> validProductMap = dedupeByProductId(esProductList);
-            //保存失败时异常继续向上抛出，后面的陈旧文档清理不会执行。
-            //saveAll底层是bulk，可能部分文档已经写入成功，本实现不做回滚补偿，
-            //只保证不再继续删除陈旧文档；索引最终一致依赖再次执行importAll收敛
-            productRepository.saveAll(new ArrayList<>(validProductMap.values()));
+            requireDistributedLockHeld(distributedLock);
+            //saveAll底层是bulk，失败时只对明确失败的商品重试一次；不做已成功文档的回滚补偿。
+            //无法解析失败商品或重试仍失败时直接中止，绝不继续清理陈旧文档。
+            saveValidProducts(validProductMap);
+            requireDistributedLockHeld(distributedLock);
             Set<Long> existingEsIds = scanExistingDocumentIds();
             List<Long> staleDocumentIds = resolveStaleDocumentIds(existingEsIds, validProductMap.keySet());
             if (!staleDocumentIds.isEmpty()) {
+                requireDistributedLockHeld(distributedLock);
                 productRepository.deleteAllById(staleDocumentIds);
             }
             LOGGER.info("商品索引全量导入完成，本次导入有效商品数量:{}，剔除陈旧ES文档数量:{}",
                     validProductMap.size(), staleDocumentIds.size());
             return validProductMap.size();
         } finally {
+            if (distributedLock != null) {
+                distributedLock.close();
+            }
             importAllLock.unlock();
         }
+    }
+
+    private void requireDistributedLockHeld(ImportAllLock distributedLock) {
+        if (distributedLock == null || !distributedLock.isHeld()) {
+            throw new ImportAllLockException("Redis 分布式锁已失效，已中止全量导入并禁止清理陈旧 ES 文档");
+        }
+    }
+
+    private void saveValidProducts(Map<Long, EsProduct> validProductMap) {
+        List<EsProduct> products = new ArrayList<>(validProductMap.values());
+        try {
+            productRepository.saveAll(products);
+        } catch (BulkFailureException firstFailure) {
+            Set<Long> failedIds = resolveBulkFailureIds(firstFailure, validProductMap.keySet());
+            if (failedIds.isEmpty()) {
+                throw firstFailure;
+            }
+            List<EsProduct> failedProducts = products.stream()
+                    .filter(product -> failedIds.contains(product.getId()))
+                    .collect(Collectors.toList());
+            if (failedProducts.size() != failedIds.size()) {
+                throw firstFailure;
+            }
+            try {
+                productRepository.saveAll(failedProducts);
+            } catch (RuntimeException retryFailure) {
+                retryFailure.addSuppressed(firstFailure);
+                throw retryFailure;
+            }
+        }
+    }
+
+    private Set<Long> resolveBulkFailureIds(BulkFailureException failure, Set<Long> validProductIds) {
+        if (failure.getFailedDocuments() == null || failure.getFailedDocuments().isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> failedIds = new LinkedHashSet<>();
+        for (String documentId : failure.getFailedDocuments().keySet()) {
+            Long parsedId = parseDocumentIdQuietly(documentId);
+            if (parsedId == null || !validProductIds.contains(parsedId)) {
+                return Collections.emptySet();
+            }
+            failedIds.add(parsedId);
+        }
+        return failedIds;
     }
 
     /**
