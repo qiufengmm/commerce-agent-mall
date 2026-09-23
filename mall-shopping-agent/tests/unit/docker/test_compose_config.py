@@ -156,6 +156,7 @@ def test_agent_container_never_receives_database_credentials(agent_service: dict
 def test_agent_container_targets_portal_and_redis_by_service_name(agent_service: dict) -> None:
     environment = agent_service["environment"]
 
+    assert environment["MALL_AGENT_OPENAI_BASE_URL"].startswith("${MALL_AGENT_OPENAI_BASE_URL")
     assert environment["MALL_AGENT_PORTAL_BASE_URL"] == "http://mall-portal:8085"
     assert environment["MALL_AGENT_REDIS_URL"] == "redis://redis:6379/0"
     assert environment["MALL_AGENT_PORT"] == "8086"
@@ -553,12 +554,55 @@ def test_invalid_model_mode_fails(env_check_runner: str, tmp_path: Path) -> None
 
 @pytest.mark.parametrize(
     "base_url",
-    ["ftp://model.local.test/v1", "https://model.local.test", "model.local.test/v1"],
+    [
+        "ftp://model.local.test/v1",
+        "model.local.test/v1",
+        "https://model.local.test/v1?query=1",
+        "https://model.local.test/v1?",
+        "https://model.local.test/v1#fragment",
+        "https://model.local.test/v1#",
+        "https://user:password@model.local.test/v1",
+        "https://model.local.test/path with space",
+        '" https://api.deepseek.com "',
+        "https://:443/v1",
+        "https://model.local.test:0/v1",
+        "https://model.local.test:70000/v1",
+        "https://model.local.test:invalid/v1",
+        "https://model.local.test:/v1",
+        "https://[::::]/v1",
+        "https://[1:2:3:4:5:6:7:8:9]/v1",
+        "https://[fe80::1%25Ethernet]/v1",
+        "https://gateway[bad].test/v1",
+    ],
 )
 def test_invalid_base_url_fails(env_check_runner: str, tmp_path: Path, base_url: str) -> None:
     env_file = _write_env_file(tmp_path, "bad-url.env", _openai_env(base_url=base_url))
 
     assert _run_env_check(env_check_runner, env_file).returncode == 1
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://api.deepseek.com",
+        "https://api.deepseek.com/",
+        "HTTPS://api.deepseek.com",
+        "https://api.openai.com/v1",
+        "http://[::1]:8086/v1/",
+        "https://gateway.local.test/compatible/v1/",
+        "https://gateway.local.test/compatible%20path/v1/",
+        "https://gateway.local.test/compatible%2Fv1/",
+    ],
+)
+def test_provider_base_urls_are_accepted(
+    env_check_runner: str, tmp_path: Path, base_url: str
+) -> None:
+    env_file = _write_env_file(tmp_path, "valid-provider-url.env", _openai_env(base_url=base_url))
+
+    result = _run_env_check(env_check_runner, env_file)
+
+    assert result.returncode == 0, f"退出码={result.returncode}\n{result.stdout}\n{result.stderr}"
+    assert TEST_API_KEY not in (result.stdout + result.stderr)
 
 
 @pytest.mark.parametrize("port", ["70000", "0", "not-a-port"])

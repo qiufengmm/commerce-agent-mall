@@ -712,6 +712,8 @@ docker compose --profile app up -d mall-shopping-agent
   避免把数据库与中间件凭据带进 agent 容器；
 - 模型模式由 `MALL_AGENT_MODEL_MODE` 控制：`openai`（默认，需要真实 Key）或
   `stub`（离线演示，不需要 Key）。占位 Key 会让聊天接口返回 503，不会被当成可用模型；
+- `MALL_AGENT_OPENAI_BASE_URL` 应填写服务商提供的 HTTP(S) 基础地址，服务端会保留路径并追加
+  `/chat/completions`；例如 DeepSeek 为 `https://api.deepseek.com`，OpenAI 为 `https://api.openai.com/v1`，不要统一强行补 `/v1`；
 - 启动前先执行智能体专用的环境校验：
 
 ```powershell

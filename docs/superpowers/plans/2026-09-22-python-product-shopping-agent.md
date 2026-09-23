@@ -4,7 +4,7 @@
 
 **Goal:** 交付一个可演示的 Python 商品导购智能体，使游客能搜索、筛选、比较、查看详情和库存，登录会员还能获得本人优惠券解释，同时严格保持交易与数据写入边界。
 
-**Architecture:** 新增独立 FastAPI 服务 `mall-shopping-agent`，通过 OpenAI 兼容 `/v1/chat/completions` 接口进行受控工具调用，仅通过 HTTP 读取 `mall-portal`；Redis 保存 24 小时短期会话和限流计数；uni-app 新增聊天页；Docker Compose 与 Nginx 统一接入。模型只生成解释和候选 ID，商品卡片与优惠券事实由服务端从工具结果构造。
+**Architecture:** 新增独立 FastAPI 服务 `mall-shopping-agent`，通过服务商基础地址下的 OpenAI 兼容 `/chat/completions` 接口进行受控工具调用，仅通过 HTTP 读取 `mall-portal`；Redis 保存 24 小时短期会话和限流计数；uni-app 新增聊天页；Docker Compose 与 Nginx 统一接入。模型只生成解释和候选 ID，商品卡片与优惠券事实由服务端从工具结果构造。
 
 **Tech Stack:** Python 3.11、FastAPI、Pydantic 2、HTTPX、redis-py、pytest、pytest-asyncio、Ruff、Vue 3、TypeScript、uni-app、Vitest、Docker Compose、Nginx。
 
@@ -51,7 +51,7 @@
   py -3.11 -m pytest tests/unit/test_config.py tests/unit/test_health.py -q
   ```
 
-- [ ] 实现 `Settings`，使用 `SettingsConfigDict(env_prefix="MALL_AGENT_", extra="ignore")`；模型变量字段名为 `openai_base_url`、`openai_api_key`、`openai_model`、`openai_timeout_seconds`，并校验 base URL 必须是 HTTP(S) 且规范化为以 `/v1` 结尾。
+- [ ] 实现 `Settings`，使用 `SettingsConfigDict(env_prefix="MALL_AGENT_", extra="ignore")`；模型变量字段名为 `openai_base_url`、`openai_api_key`、`openai_model`、`openai_timeout_seconds`，并校验 base URL 是 HTTP(S) 基础地址，保留服务商路径前缀，不强制追加 `/v1`。
 - [ ] 实现依赖可替换的 readiness probes，并创建 FastAPI `app`。健康响应不泄露内部 URL、Key 或异常正文。
 - [ ] 在 `.gitignore` 明确加入 `.venv/`、`.pytest_cache/`、`.ruff_cache/`。
 - [ ] 运行：

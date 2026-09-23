@@ -226,7 +226,7 @@ mall:agent:rate:ip:<ipHash>:<window>
 <MALL_AGENT_OPENAI_BASE_URL>/chat/completions
 ```
 
-`MALL_AGENT_OPENAI_BASE_URL` 应包含协议、主机和 `/v1` 前缀。请求使用 `Authorization: Bearer <api-key>`，模型名来自配置。API Key 只存在于进程环境和请求头中。
+`MALL_AGENT_OPENAI_BASE_URL` 应填写服务商提供的 HTTP(S) 基础地址，不要自行增删路径前缀；例如 DeepSeek 使用 `https://api.deepseek.com`，OpenAI 使用 `https://api.openai.com/v1`。服务会在该地址后追加 `/chat/completions`。请求使用 `Authorization: Bearer <api-key>`，模型名来自配置。API Key 只存在于进程环境和请求头中。
 
 客户端必须支持普通非流式响应以及 OpenAI 风格的 `tools`、`tool_choice` 和 `tool_calls`。兼容服务若不支持工具调用，启动不失败，但聊天接口返回明确的模型能力错误，不退化为让模型凭空回答商品事实。
 

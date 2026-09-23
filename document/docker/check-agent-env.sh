@@ -10,7 +10,7 @@
 #   1. MALL_AGENT_MODEL_MODE 只能是 openai 或 stub；
 #   2. openai 模式要求 MALL_AGENT_OPENAI_BASE_URL、MALL_AGENT_OPENAI_MODEL、
 #      MALL_AGENT_OPENAI_API_KEY 均为非占位值；stub 模式允许 API Key 为空；
-#   3. MALL_AGENT_OPENAI_BASE_URL 必须是 http(s) 地址并包含 /v1；
+#   3. MALL_AGENT_OPENAI_BASE_URL 必须是无空白、查询参数、片段/内嵌凭据且主机与端口有效的 http(s) 基础地址；
 #   4. MALL_AGENT_PORTAL_BASE_URL、MALL_AGENT_REDIS_URL 协议合法；
 #   5. AGENT_PORT 为 1..65535 的端口号；MALL_AGENT_LOG_LEVEL 取值合法；
 #   6. 必检变量出现重复定义时直接判定为失败（拒绝只取最后一个值）。
@@ -111,6 +111,72 @@ is_placeholder() {
     return 1
 }
 
+# Bash 的 URL 正则无法单独证明方括号内是有效 IPv6；这里按 hextet 数量与压缩规则校验。
+is_valid_ipv4() {
+    local address="$1"
+    local -a octets=()
+    local octet
+
+    IFS=. read -r -a octets <<< "$address"
+    [ "${#octets[@]}" -eq 4 ] || return 1
+
+    for octet in "${octets[@]}"; do
+        [[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+        [ "${#octet}" -le 3 ] || return 1
+        [[ "$octet" == "0" || "$octet" != 0* ]] || return 1
+        (( 10#$octet <= 255 )) || return 1
+    done
+
+    return 0
+}
+
+is_valid_ipv6() {
+    local address="$1"
+    local hex_address="$address"
+    local compressed=false
+    local ipv4_groups=0
+    local group
+    local group_count=0
+    local -a groups=()
+
+    [[ "$address" == *:* ]] || return 1
+    [[ "$address" != *:::* ]] || return 1
+
+    if [[ "$address" == *"::"* ]]; then
+        local remainder="${address#*::}"
+        [[ "$remainder" != *"::"* ]] || return 1
+        compressed=true
+    fi
+
+    if [[ "$address" == :* && "$address" != ::* ]] ||
+       [[ "$address" == *: && "$address" != *:: ]]; then
+        return 1
+    fi
+
+    if [[ "$address" == *.* ]]; then
+        local ipv4_address="${address##*:}"
+        is_valid_ipv4 "$ipv4_address" || return 1
+        hex_address="${address%:*}"
+        ipv4_groups=2
+    fi
+
+    IFS=: read -r -a groups <<< "$hex_address"
+    for group in "${groups[@]}"; do
+        [ -z "$group" ] && continue
+        [[ "$group" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+        group_count=$((group_count + 1))
+    done
+    group_count=$((group_count + ipv4_groups))
+
+    if [[ "$compressed" == true ]]; then
+        [ "$group_count" -lt 8 ] || return 1
+    else
+        [ "$group_count" -eq 8 ] || return 1
+    fi
+
+    return 0
+}
+
 FAILURES=0
 WARNINGS=0
 
@@ -166,24 +232,37 @@ if check_duplicate "MALL_AGENT_OPENAI_BASE_URL"; then
         echo "  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 缺失或仍是占位值"
         FAILURES=$((FAILURES + 1))
     else
-        case "$BASE_URL" in
-            http://*|https://*)
-                base_without_slash="${BASE_URL%/}"
-                case "$base_without_slash" in
-                    */v1)
-                        echo "  [ OK ] MALL_AGENT_OPENAI_BASE_URL: 已设置为 http(s) 且包含 /v1"
-                        ;;
-                    *)
-                        echo "  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须以 /v1 结尾（服务端会据此拼接 /chat/completions）"
-                        FAILURES=$((FAILURES + 1))
-                        ;;
-                esac
-                ;;
-            *)
-                echo "  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须是 http(s) 地址"
-                FAILURES=$((FAILURES + 1))
-                ;;
-        esac
+        base_url_is_valid=false
+        if [[ "$BASE_URL" =~ ^[Hh][Tt][Tt][Pp][Ss]?://(\[[0-9A-Fa-f:.]+\]|[^/:@?#[:space:]]+)(:([0-9]+))?(/[^?#[:space:]]*)?$ ]]; then
+            base_host="${BASH_REMATCH[1]}"
+            base_port="${BASH_REMATCH[3]:-}"
+
+            if [[ "$base_host" == \[* ]]; then
+                ipv6_host="${base_host:1:${#base_host}-2}"
+                is_valid_ipv6 "$ipv6_host" || base_port="invalid"
+            elif [[ "$base_host" == *'['* || "$base_host" == *']'* ]]; then
+                base_port="invalid"
+            fi
+
+            if [[ "$base_port" != invalid ]]; then
+                if [[ -z "$base_port" ]]; then
+                    base_url_is_valid=true
+                else
+                    normalized_base_port="${base_port#"${base_port%%[!0]*}"}"
+                    [ -z "$normalized_base_port" ] && normalized_base_port=0
+                    if [ "${#normalized_base_port}" -le 5 ] && (( 10#$normalized_base_port >= 1 && 10#$normalized_base_port <= 65535 )); then
+                        base_url_is_valid=true
+                    fi
+                fi
+            fi
+        fi
+
+        if [[ "$base_url_is_valid" == true ]]; then
+            echo "  [ OK ] MALL_AGENT_OPENAI_BASE_URL: http(s) 基础地址有效，将追加 /chat/completions"
+        else
+            echo "  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须是主机/端口有效且无空白、查询参数、片段或内嵌凭据的 http(s) 基础地址"
+            FAILURES=$((FAILURES + 1))
+        fi
     fi
 fi
 
