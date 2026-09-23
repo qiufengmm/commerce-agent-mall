@@ -49,6 +49,7 @@ class Recorder:
 def build_client(
     handler: Callable[[httpx.Request], httpx.Response],
     *,
+    base_url: str = "https://model.example.com/v1",
     timeout_seconds: float = 30.0,
     max_retries: int = 1,
 ) -> OpenAICompatibleClient:
@@ -56,7 +57,7 @@ def build_client(
         return None
 
     return OpenAICompatibleClient(
-        base_url="https://model.example.com/v1",
+        base_url=base_url,
         api_key=API_KEY,
         model="demo-model",
         timeout_seconds=timeout_seconds,
@@ -112,6 +113,16 @@ async def test_posts_json_to_chat_completions_with_bearer_and_non_streaming() ->
     assert payload["tool_choice"] == "auto"
     assert payload["tools"] == TOOLS
     assert payload["messages"][0] == {"role": "system", "content": "系统规则"}
+
+
+async def test_deepseek_root_base_url_does_not_gain_v1_path() -> None:
+    recorder = Recorder(lambda request: text_response())
+    client = build_client(recorder, base_url="https://api.deepseek.com")
+
+    await client.complete(request_with_tools())
+
+    assert recorder.calls == 1
+    assert str(recorder.requests[0].url) == "https://api.deepseek.com/chat/completions"
 
 
 async def test_returns_normalised_text_and_usage() -> None:

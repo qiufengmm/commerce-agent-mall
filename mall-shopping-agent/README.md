@@ -1,7 +1,7 @@
 # mall-shopping-agent
 
-Mall 商品导购智能体（第一版）。基于 Python 3.11 + FastAPI，通过 OpenAI 兼容
-`/v1/chat/completions` 接口进行受控工具调用，并且只通过 HTTP 读取 `mall-portal`
+Mall 商品导购智能体（第一版）。基于 Python 3.11 + FastAPI，通过服务商基础地址下的
+`/chat/completions` 接口进行受控工具调用，并且只通过 HTTP 读取 `mall-portal`
 的公开与会员只读接口。
 
 > 本服务不包含任何写操作：不领券、不加购、不下单、不支付、不改库存、不写 ES、
@@ -95,7 +95,7 @@ mall:agent:rate:ip:<ipHash>:<window>
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `MALL_AGENT_MODEL_MODE` | `openai` | `openai` 或 `stub`；默认必须是 `openai` |
-| `MALL_AGENT_OPENAI_BASE_URL` | `https://api.openai.com/v1` | 必须包含 `/v1`，服务端会规范化 |
+| `MALL_AGENT_OPENAI_BASE_URL` | `https://api.openai.com/v1` | 填服务商给出的 HTTP(S) 基础地址；DeepSeek 示例为 `https://api.deepseek.com`，服务端保留路径并追加 `/chat/completions` |
 | `MALL_AGENT_OPENAI_API_KEY` | 空 | 只存在进程环境与请求头；占位值会被判定为不可用 |
 | `MALL_AGENT_OPENAI_MODEL` | `gpt-4o-mini` | 兼容服务必须支持 `tools` / `tool_choice` / `tool_calls` |
 | `MALL_AGENT_OPENAI_TIMEOUT_SECONDS` | `30` | 连接、读取与总超时均不超过该值 |
@@ -132,7 +132,7 @@ Stub 模式使用确定性脚本：先调用一次 `searchProducts`，再给出�
 
 ```powershell
 $env:MALL_AGENT_MODEL_MODE = 'openai'
-$env:MALL_AGENT_OPENAI_BASE_URL = 'https://<你的兼容服务>/v1'
+$env:MALL_AGENT_OPENAI_BASE_URL = 'https://api.deepseek.com' # 按服务商文档填写基础地址
 $env:MALL_AGENT_OPENAI_API_KEY = '<本地凭据>'
 $env:MALL_AGENT_OPENAI_MODEL = '<模型名>'
 .\.venv\Scripts\python.exe -m uvicorn mall_shopping_agent.main:app --host 127.0.0.1 --port 8086

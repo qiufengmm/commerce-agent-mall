@@ -54,18 +54,37 @@ def is_placeholder(value: str | None) -> bool:
 
 def _require_http_url(value: str, field_name: str) -> str:
     text = (value or "").strip()
-    parts = urlsplit(text)
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
+    try:
+        parts = urlsplit(text)
+        hostname = parts.hostname
+        port = parts.port
+    except ValueError:
+        raise ValueError(f"{field_name} 必须是包含有效主机与端口的 http(s) 地址") from None
+    if (
+        parts.scheme not in {"http", "https"}
+        or not parts.netloc
+        or not hostname
+        or (port is not None and not 1 <= port <= 65535)
+    ):
         raise ValueError(f"{field_name} 必须是包含协议与主机的 http(s) 地址")
     return text
 
 
 def _normalise_openai_base_url(value: str) -> str:
-    text = _require_http_url(value, "openai_base_url")
+    raw_value = value or ""
+    if any(character.isspace() for character in raw_value):
+        raise ValueError("openai_base_url 不能包含空白字符")
+    text = _require_http_url(raw_value, "openai_base_url")
     parts = urlsplit(text)
+    if (
+        "?" in text
+        or "#" in text
+        or "@" in parts.netloc
+        or parts.netloc.endswith(":")
+        or (parts.netloc.startswith("[") and "%" in parts.netloc.split("]", 1)[0])
+    ):
+        raise ValueError("openai_base_url 不能包含查询参数、片段或 URL 凭据")
     path = parts.path.rstrip("/")
-    if not path.endswith("/v1"):
-        path = f"{path}/v1"
     return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 

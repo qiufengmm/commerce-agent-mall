@@ -11,7 +11,7 @@
       1. MALL_AGENT_MODEL_MODE 只能是 openai 或 stub；
       2. openai 模式要求 MALL_AGENT_OPENAI_BASE_URL、MALL_AGENT_OPENAI_MODEL、
          MALL_AGENT_OPENAI_API_KEY 均为非占位值；stub 模式允许 API Key 为空；
-      3. MALL_AGENT_OPENAI_BASE_URL 必须是 http(s) 地址并包含 /v1；
+      3. MALL_AGENT_OPENAI_BASE_URL 必须是无空白、查询参数、片段/内嵌凭据且主机与端口有效的 http(s) 基础地址；
       4. MALL_AGENT_PORTAL_BASE_URL、MALL_AGENT_REDIS_URL 协议合法；
       5. AGENT_PORT 为 1..65535 的端口号；MALL_AGENT_LOG_LEVEL 取值合法；
       6. 必检变量出现重复定义时直接判定为失败（拒绝只取最后一个值）。
@@ -174,22 +174,43 @@ else {
 Write-Host ''
 Write-Host '--- 模型服务配置 ---'
 
+function Test-OpenAIBaseUrl {
+    param([string] $Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -match '\s' -or
+        $Value.Contains('?') -or $Value.Contains('#') -or
+        $Value -match '\[[^\]]*%[^\]]*\]') { return $false }
+
+    $authority = ($Value -split '://', 2)[-1].Split('/')[0]
+    if ($authority.EndsWith(':')) { return $false }
+
+    $parsedUrl = $null
+    if (-not [System.Uri]::TryCreate($Value, [System.UriKind]::Absolute, [ref] $parsedUrl)) {
+        return $false
+    }
+
+    return (
+        $parsedUrl.Scheme -in @('http', 'https') -and
+        -not [string]::IsNullOrWhiteSpace($parsedUrl.Host) -and
+        $parsedUrl.Port -ge 1 -and $parsedUrl.Port -le 65535 -and
+        [string]::IsNullOrEmpty($parsedUrl.Query) -and
+        [string]::IsNullOrEmpty($parsedUrl.Fragment) -and
+        [string]::IsNullOrEmpty($parsedUrl.UserInfo)
+    )
+}
+
 if (-not (Test-Duplicate -Name 'MALL_AGENT_OPENAI_BASE_URL')) {
     $baseUrl = Get-EnvValue -Map $envMap -Name 'MALL_AGENT_OPENAI_BASE_URL'
     if (Test-Placeholder -Value $baseUrl) {
         Write-Host '  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 缺失或仍是占位值'
         $failures.Add('MALL_AGENT_OPENAI_BASE_URL: 缺失或占位值')
     }
-    elseif (-not ($baseUrl -match '^https?://')) {
-        Write-Host '  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须是 http(s) 地址'
-        $failures.Add('MALL_AGENT_OPENAI_BASE_URL: 协议非法')
-    }
-    elseif (-not ($baseUrl.TrimEnd('/') -match '/v1$')) {
-        Write-Host '  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须以 /v1 结尾（服务端会据此拼接 /chat/completions）'
-        $failures.Add('MALL_AGENT_OPENAI_BASE_URL: 缺少 /v1')
+    elseif (-not (Test-OpenAIBaseUrl -Value $baseUrl)) {
+        Write-Host '  [FAIL] MALL_AGENT_OPENAI_BASE_URL: 必须是主机/端口有效且无空白、查询参数、片段或内嵌凭据的 http(s) 基础地址'
+        $failures.Add('MALL_AGENT_OPENAI_BASE_URL: 地址格式非法')
     }
     else {
-        Write-Host '  [ OK ] MALL_AGENT_OPENAI_BASE_URL: 已设置为 http(s) 且包含 /v1'
+        Write-Host '  [ OK ] MALL_AGENT_OPENAI_BASE_URL: http(s) 基础地址有效，将追加 /chat/completions'
     }
 }
 
