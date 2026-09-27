@@ -740,11 +740,14 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
   - **勾选**：**Task 13 Step 2 保持 `[ ]`**，不勾选。
   - **Git 边界**：Java 分支**未 commit / merge / push**；`main` 与 `origin/main` 仍为 `56810c2`。
 
-## 2026-09-27 合并前最终复核
+## 2026-09-27 本地提交、合并与合并后复核
 
 - **本轮行为修正**：商品详情 SKU 的 `spData` 已从门户响应经 DTO 传到详情工具；会话 GET/DELETE 在身份解析前各按可信客户端 IP 消耗一次现有 IP 桶，超限 429，不消耗会话桶。详见 `.codebuddy/reports/java-agent-final-hardening-report.md`。
 - **Nginx 最终配置**：`/agent-api/` 使用 `client_max_body_size 32k`、`proxy_read_timeout 60s` 和 location 级 `error_log /dev/null`；最后一项会丢弃该路由 Nginx 错误诊断，脱敏 access log 仍记录方法、状态与耗时。其他代理保持原 120s 读超时与 server 级 20m body limit。
 - **静态/动态验证**：本轮全 reactor Maven 1333 项，失败/错误 0、跳过 8（均为真实 Redis 门控用例，未配置独立测试 Redis）；Python Compose/Nginx 测试 163 passed；Compose 默认与全部 profile 配置均 exit 0；隔离 Nginx 实测 32k 限制（40k 请求 413）、无上游 502、日志不含测试 UUID；所有临时容器已清理，主 Compose 当前容器快照均 healthy。
 - **只读审查**：Java 与部署审查均无 Critical/Important；审查建议的 DELETE 可信代理正路径覆盖、嵌套 location 解析器与 Compose 超时注释已补齐。没有提交级阻断。
 - **尚未完成**：真实会员优惠券与微信真机、正式 HTTPS/小程序合法域名仍按用户决定暂缓；主栈 `8088` chat 的最新变更后 E2E 未在本轮执行；GET/DELETE 跨实例互斥仍未实现。
-- **Git**：已创建中文提交 `96bafb7`（实现 Java 商品导购智能体并完善部署安全）；功能工作树干净，待合并到 `main`。当前 main 基线 `56810c2`；不 push。
+- **功能提交**：`96bafb7`（实现 Java 商品导购智能体并完善部署安全）；`5182cea`（记录 Java 智能体迁移提交信息）。
+- **本地合并**：`main` 以非快进方式合并，提交 `18b5408cb7076f98b3da38c61fec0e9a82fa067b`（合并 Java 商品导购智能体迁移），无冲突。
+- **合并后复验**：在 `main` 新跑全 reactor `mvn -o -q -f mall-master/pom.xml test`，exit 0；本轮 Surefire 新鲜报告合计 1333 项、0 失败、0 错误、8 跳过（真实 Redis 门控用例）；`python -m pytest tests/unit/docker/test_compose_config.py -q` 为 163 passed；Compose 默认配置和 app/edge/observability 全 profile 配置均 exit 0；`git show --check` 无空白错误。
+- **远程边界**：`origin/main` 仍为 `56810c2`；本次交接记录提交后，本地 `main` 共比远程多 5 个提交（含本地既有提交、功能提交、合并及本次文档记录）。未执行 push；提交后 `main` 工作区干净。
