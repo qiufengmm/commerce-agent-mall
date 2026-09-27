@@ -11,7 +11,12 @@
 **/.vite/
 
 # 版本库与 IDE
+# `.git/` 排除普通仓库的 .git 目录；
+# `.git` 精确排除 Windows linked-worktree 下的 .git 文件（Git 链接文件，不是目录）
 .git/
+.git
+# 其他工作树：构建上下文是仓库根，若不排除会把每个工作树完整送入上下文
+.worktrees/
 **/.idea/
 **/.vscode/
 

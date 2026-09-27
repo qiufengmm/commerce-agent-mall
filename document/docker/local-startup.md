@@ -7,7 +7,7 @@
 
 推荐第一次严格按以下顺序执行：进入仓库根目录 → 创建 `.env` → 校验配置 → 拉取镜像 → 启动基础设施 →（确认后）初始化数据库 → 构建 Java 应用 → 构建前端并启动 Nginx → 检查 MinIO bucket/匿名策略并导入 ES → 停止服务。
 
-全栈 `app + edge` 模式包含 10 个常驻服务，另有一次性 `minio-init`；后者成功状态是 `Exited (0)`，不是常驻 `healthy`。
+全栈 `app + edge` 模式包含 11 个常驻服务（6 个基础设施 + 4 个 Java 服务 + Nginx），另有一次性 `minio-init`；后者成功状态是 `Exited (0)`，不是常驻 `healthy`。
 
 详细解释和故障排查见后续章节；本文档不会替你执行任何 SQL。
 
@@ -89,7 +89,7 @@ docker compose --env-file .env --profile app up -d
 docker compose --env-file .env --profile app ps -a
 ```
 
-作用：构建并启动 `mall-search`、`mall-admin`、`mall-portal`。`mall-admin` 还会等待 `minio-init` 成功退出；失败时先看 `docker compose --env-file .env logs --tail=200 mall-search mall-admin mall-portal`。
+作用：构建并启动 `mall-search`、`mall-admin`、`mall-portal` 与 `mall-shopping-agent`（商品导购智能体，Java 17）。`mall-admin` 还会等待 `minio-init` 成功退出；失败时先看 `docker compose --env-file .env logs --tail=200 mall-search mall-admin mall-portal mall-shopping-agent`。
 
 ### 8. 构建前端并启动 Nginx
 
@@ -157,7 +157,7 @@ document/docker/logstash/pipeline/logstash.conf  Logstash 管道配置
 | 项目 | 要求 |
 | --- | --- |
 | Docker Desktop | 已安装并启动，Docker Engine 版本需支持 Compose Spec（本机实测 29.5.3 / Compose v5.1.4） |
-| 可用内存 | 建议 ≥ 8 GB；最低 4 GB（Elasticsearch 默认堆 1 GB，Logstash 512 MB，三个 Java 应用各约 1 GB） |
+| 可用内存 | 建议 ≥ 8 GB；最低 4 GB（Elasticsearch 默认堆 1 GB，Logstash 512 MB，四个 Java 服务各约 1 GB） |
 | 磁盘 | 建议 ≥ 20 GB 可用空间（命名数据卷 + 镜像层） |
 | 构建工具（仅构建应用镜像时需要） | Maven 由构建容器内提供，宿主机不强制要求；宿主机运行 Java 服务时需要 JDK 17 + Maven |
 
@@ -193,7 +193,7 @@ foreach ($p in $ports) {
 
 **默认访问地址全部是 `localhost` / `127.0.0.1`。** Compose 中每一条宿主机端口映射都显式
 带了 `127.0.0.1` 前缀，默认不暴露到局域网；已用解析后的配置核对过
-（`docker compose config --format json`，共 17 条发布端口，全部 `host_ip = 127.0.0.1`）。
+（`docker compose config --format json`，共 18 条发布端口，全部 `host_ip = 127.0.0.1`）。
 
 只有两个服务提供**按服务 opt-in** 的绑定地址变量，用于手机 / 微信开发者工具联调：
 
@@ -205,8 +205,9 @@ foreach ($p in $ports) {
 ### 1.3 局域网 / 真机联调（正确的启动命令）
 
 > **注意**：只执行 `docker compose --profile edge up -d` **不会**启动
-> `mall-admin` / `mall-search` / `mall-portal`，此时访问 `/admin-api/`、`/portal-api/`
-> 一定返回 502。需要 Java 应用时必须同时带上 `--profile app`。
+> `mall-admin` / `mall-search` / `mall-portal` / `mall-shopping-agent`，此时访问
+> `/admin-api/`、`/portal-api/`、`/es-api/`、`/agent-api/`
+> 一定返回 502。需要 Java 服务时必须同时带上 `--profile app`。
 
 推荐做法：把 `MINIO_BIND_ADDR` / `NGINX_BIND_ADDR` 写进 `.env`（而不是临时环境变量，
 避免下次启动忘记改回来），再按需要启动：
@@ -265,7 +266,7 @@ docker compose --profile edge up -d
 | Nginx | `nginx:1.27-alpine` |
 | Logstash | `docker.elastic.co/logstash/logstash:8.18.3` |
 | Kibana | `docker.elastic.co/kibana/kibana:8.18.8` |
-| 商品导购智能体 | `python:3.11-slim`（固定，本地源码构建为 `mall-local/mall-shopping-agent:local`） |
+| 商品导购智能体（`mall-agent`） | 构建期 `maven:3.9-eclipse-temurin-17`、运行期 `eclipse-temurin:17-jre`（由 `document/docker/Dockerfile.app` 以 `MODULE=mall-agent` 构建为 `mall-local/mall-shopping-agent:local`） |
 
 ### 2.1 镜像标签拉取验证状态
 
@@ -284,7 +285,8 @@ docker compose --profile edge up -d
 - 构建阶段：`maven:3.9-eclipse-temurin-17`
 - 运行阶段：`eclipse-temurin:17-jre`（Debian/Ubuntu 系列，提供 `apt-get`）
 
-原因：Compose 中三个 Java 服务的健康检查使用 `curl` 访问 `/actuator/health`，
+原因：Compose 中 Java 服务的健康检查都使用 `curl`——`mall-admin` / `mall-search` / `mall-portal`
+访问各自的 `/actuator/health`，`mall-shopping-agent` 访问自身的 `/health/live`；
 Dockerfile 在运行阶段执行 `apt-get install -y curl` 来提供该命令。
 如果换成 Alpine 等不含 `apt-get` 的运行时镜像，会出现两类问题：
 
@@ -496,7 +498,7 @@ bash document/docker/check-env.sh
 | 模式 | 启动命令 | 启动内容 | 适用场景 |
 | --- | --- | --- | --- |
 | 开发模式（推荐日常开发） | `docker compose up -d` | 仅基础设施 | Java 服务在 IDE / 宿主机运行，改代码免重建镜像，调试最方便 |
-| 全栈模式 | `docker compose --profile app --profile edge up -d` | 基础设施 + 三个 Java 应用 + Nginx | 验证容器化部署、前端联调、整体链路 |
+| 全栈模式 | `docker compose --profile app --profile edge up -d` | 基础设施 + 四个 Java 服务 + Nginx | 验证容器化部署、前端联调、整体链路 |
 | 可选观测模式 | `docker compose --profile observability up -d` | 基础设施 + Logstash + Kibana | 需要采集与检索应用日志时按需开启 |
 | 全量 | `docker compose --profile app --profile edge --profile observability up -d` | 全部 | 一次性拉起所有组件 |
 
@@ -538,10 +540,14 @@ docker compose --profile app up -d
 | `mall-admin` | 8080 | `127.0.0.1:8080:8080` | 显式设置 `SERVER_PORT=8080` |
 | `mall-search` | 8081 | `127.0.0.1:8081:8081` | 显式设置 `SERVER_PORT=8081` |
 | `mall-portal` | 8085 | `127.0.0.1:8085:8085` | 显式设置 `SERVER_PORT=8085` |
+| `mall-shopping-agent` | 8086 | `127.0.0.1:8086:8086` | 由 `MALL_AGENT_HOST` / `MALL_AGENT_PORT` 控制，healthcheck 探 `/health/live`，详见 4.7 |
 
 - `mall-portal` 的 `application.yml` **没有** `server.port`，且本工作树中没有
   `application-dev.yml`，因此 Compose 通过环境变量 `SERVER_PORT=8085` 显式声明端口；
-  三个服务都做了同样处理，不依赖模块默认配置。
+  上表前三个业务服务都做了同样处理，不依赖模块默认配置。
+- `mall-shopping-agent` 走的是另一套配置：它显式声明 `MALL_AGENT_HOST=0.0.0.0` 与
+  `MALL_AGENT_PORT=8086`（`application.yml` 的 `server.port: ${MALL_AGENT_PORT:8086}`），
+  不使用 `SERVER_PORT`；依赖与健康探针见 4.7。
 - `mall-admin` 与 `mall-portal` 都调用 `mall-search`，两者都在 `depends_on` 中声明了
   `mall-search: condition: service_healthy`，**必须等 mall-search 健康后才启动**。
 - `mall-admin` 额外声明 `minio-init: condition: service_completed_successfully`：
@@ -556,14 +562,16 @@ docker compose --profile app up -d
 - `mall-search` 只依赖 `mysql` 与 `elasticsearch` 的健康状态，不反向依赖
   admin/portal；`minio-init` 只依赖 `minio`，`minio` 不依赖任何服务，
   因此**不存在循环依赖**。
-- 使用 `document/docker/Dockerfile.app` 从本地源码多阶段构建，三个应用复用同一个
+- 使用 `document/docker/Dockerfile.app` 从本地源码多阶段构建，四个 Java 服务
+  （`mall-admin` / `mall-search` / `mall-portal` / `mall-shopping-agent`）复用同一个
   Dockerfile，通过 `MODULE` / `JAR_FILE` 参数区分。
 - 不依赖任何预构建的 `mall/*:1.0-SNAPSHOT` 镜像，构建出的本地镜像名为
   `mall-local/mall-admin:local` 等（前缀可用 `APP_IMAGE_PREFIX` 覆盖）。
 - 容器内通过服务名访问基础设施（`mysql`、`redis`、`rabbitmq`、`mongo`、
   `elasticsearch`、`minio`、`mall-search`），全部连接信息由环境变量注入，
   **未修改任何 `application*.yml`**。
-- 三个服务都映射了宿主机端口，可直接用 `http://localhost:8080` 等方式调试。
+- 四个 Java 服务都映射了宿主机端口，可直接用 `http://localhost:8080`、
+  `http://localhost:8086` 等方式调试。
 
 启动顺序示意：
 
@@ -575,6 +583,7 @@ minio (health OK)
 
 mall-admin  (8080)  <- mall-search(health OK) + mysql + redis + minio + minio-init(退出码 0)
 mall-portal (8085)  <- mall-search(health OK) + mysql + redis + mongo + rabbitmq
+mall-shopping-agent (8086) <- redis(health OK) + mall-portal(health OK)   # 详见 4.7
 ```
 
 ### 4.5 Nginx（`edge` profile）
@@ -586,7 +595,7 @@ docker compose --profile edge up -d
 - 管理后台静态资源：`http://localhost:8088/`
 - H5 静态资源：`http://localhost:8088/h5/`
 - 反向代理：`/admin-api/` → mall-admin 8080、`/portal-api/` → mall-portal 8085、
-  `/es-api/` → mall-search 8081
+  `/es-api/` → mall-search 8081、`/agent-api/` → mall-shopping-agent 8086
 
 **H5 通过 Nginx 访问时的路径规则（重要）**：
 
@@ -699,6 +708,12 @@ Logstash 的 9600 API 默认只在容器内监听，宿主机以 `docker inspect
 
 ### 4.7 商品导购智能体（`app` profile）
 
+运行实现是 **Java 17 的 `mall-master/mall-agent`**：Compose 用 `document/docker/Dockerfile.app`
+以 `MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086` 从仓库根
+构建，运行镜像为 `eclipse-temurin:17-jre`，启动命令是 `java -jar /app/app.jar`。
+`mall-shopping-agent/` 下的 Python 源码、测试与 `document/docker/Dockerfile.agent`
+仅作参考保留，Compose 不再构建它们。
+
 ```powershell
 docker compose --profile app build mall-shopping-agent   # 首次需要构建
 docker compose --profile app up -d mall-shopping-agent
@@ -708,8 +723,56 @@ docker compose --profile app up -d mall-shopping-agent
 - 只读访问 `mall-portal`（`http://mall-portal:8085`），会话与限流状态存放在 Redis
   （`redis://redis:6379/0`），**不直连 MySQL / MongoDB / RabbitMQ / Elasticsearch**；
 - `depends_on` 为 `redis`（healthy）与 `mall-portal`（healthy），不存在依赖环；
-- Compose **不挂载根 `.env`**，只注入 `MALL_AGENT_*` 白名单变量，
-  避免把数据库与中间件凭据带进 agent 容器；
+- **网络隔离（静态配置）**：`mall-shopping-agent` **不再接入 `mall-net`**，只接入两张专用网络：
+  - `agent-proxy-net`（普通 bridge，固定子网 `172.21.240.0/29`）：只有 Nginx 与 Agent 接入，
+    Nginx 固定静态地址 `172.21.240.2`，Agent 固定静态地址 `172.21.240.3`；
+  - `agent-backend-net`（普通 bridge，**非** `internal`）：只在 Agent / `redis` / `mall-portal` 之间
+    提供最小通路，Redis 与 `mall-portal` 同时保留在 `mall-net` 上。
+  因此 Agent 无法在网络上看到 MySQL / MongoDB / Elasticsearch 等无关服务；但 `agent-backend-net`
+  **不是 internal**，Agent 仍可通过 Docker 出网调用外部模型 API；
+- **可信代理边界（静态配置）**：Agent 通过固定变量 `MALL_AGENT_TRUSTED_PROXY_IP=172.21.240.2`
+  只信任 Nginx 在 `agent-proxy-net` 上的对端，仅当请求对端与该地址**按地址字节相等**时才采信
+  `X-Real-IP`；该值为 Compose 容器固定项，**不受宿主 `.env` 覆盖**（`.env.example` 中留空仅作
+  宿主机直跑参考，直接运行默认不信任代理）；
+- **运行用户（镜像 build args + Compose user 双重约束）**：共享 `document/docker/Dockerfile.app` 的
+  runtime 运行身份由 ARG 选择——`ARG APP_RUN_USER=root` 与 `ARG APP_HOME=/root`（**默认 root /
+  `HOME=/root`**）。`mall-admin` / `mall-search` / `mall-portal` 的 `build.args` **不传**这两个参数，
+  **保持迁移前的 root 身份与 `HOME=/root`**（**不得**把这「旧三服务」写成非 root）；只有
+  `mall-shopping-agent` 在 `build.args` 传 `APP_RUN_USER=mallapp` + `APP_HOME=/app`，并在服务上保留
+  `user: "10001:10001"`，两者取值一致，因此 Agent 的非 root 由**镜像 build args 与 Compose `user`
+  双重约束**，不再是「仅由 Compose 覆盖用户」；
+- Compose **不挂载根 `.env`**，只注入 `AgentProperties` 的 23 个 `MALL_AGENT_*`
+  白名单变量（外加 `TZ`），避免把数据库与中间件凭据带进 agent 容器；
+- `.env.example` 把这 23 个变量按**两段契约**标注：**A 类（7 个）为宿主可调**，Compose 以
+  `${VAR:-默认值}` 插值，宿主 `.env` 可覆盖；**B 类（16 个）为 Compose 容器固定值**，
+  不通过宿主 `.env` 覆盖，固定段所列取值仅供宿主机直跑 Java 时参考。安全 / 超时 / 限流参数
+  一律归入 B 类，例如 `MALL_AGENT_REQUEST_TIMEOUT_SECONDS` 固定 35 秒，门户身份解析另需最多 10 秒，
+  Nginx 对 `/agent-api/` 的 `proxy_read_timeout` 为 60 秒并覆盖两段预算；可信代理 `MALL_AGENT_TRUSTED_PROXY_IP` 同属
+  B 类固定值；
+- 容器健康探针使用 mall-agent **自定义**的 `/health/live`（由 `mall-master/mall-agent` 的
+  `HealthController` 提供），**不依赖 Spring Boot Actuator**。模块经父 POM 引入了 actuator starter，
+  可能存在 `/actuator/*` 端点，但**本轮未实测，不对其运行时可用性下结论**；容器探针不使用它：
+  - `GET /health/live`：只反映进程存活，**恒返回 200** 与 `{"status":"UP"}`；Compose healthcheck 用它；
+  - `GET /health/ready`：语义是「所有已注册探针都健康才算就绪」（就绪 200 UP / 否则 503 DOWN）。
+    **当前源码** `AgentHealthConfiguration` 已注册两个**真实探针**，都只在 `/health/ready` 请求时
+    才访问依赖，启动阶段不建立任何连接：
+    - `portalHealthProbe`（由 `PortalSearchHealthProbe` 包装 `MallPortalClient.isServiceReady()`）：
+      复用门户客户端已配置超时，发送**固定匿名只读**请求 `GET /product/search?pageNum=1&pageSize=1`，
+      仅当 HTTP 200、业务 `code=200` 且 `data.total` 为非负整数时判为健康；
+    - `redisHealthProbe`（`RedisPingHealthProbe`）：惰性获取连接并执行只读 `PING`，仅当返回
+      `PONG` 时判为健康；缺 `RedisConnectionFactory` 时失败关闭为固定 `false`。
+    两个探针**均健康时 `/health/ready` 返回 200 UP，否则 503 + `{"status":"DOWN"}`**；
+  - `/health/ready` **不用于容器 healthcheck**：Compose healthcheck 只用 `/health/live`（见下）；
+- 排查提示：`/health/ready` 现在会真实探测依赖，**503 表示门户只读检查或 Redis `PING` 未通过**
+  （或 Redis 探针因缺连接工厂而失败关闭），应据此排查 `mall-portal` 与 Redis；但**仍需先确认容器
+  跑的是哪个镜像**——历史旧镜像（2026-09-25 构建）的探针是固定 `false` 占位实现，其 503 与依赖
+  可达性无关（见下方「当前运行状态」）。`/health/live` **只能确认进程存活，不能证明
+  Redis / `mall-portal` 或聊天业务已就绪**，不要把它当成服务可用性的判据；
+- 另外三个 Java 服务（`mall-admin` / `mall-search` / `mall-portal`）的健康检查走 Spring Boot
+  Actuator 的 `/actuator/health`（`curl`），与 mall-agent 的 `/health/live`、`/health/ready`
+  是两套接口，不要混用；
+- Compose healthcheck 命令为运行镜像内已安装的 `curl -fsS http://127.0.0.1:8086/health/live`，
+  **只探 `/health/live`**，不探 `/health/ready`；
 - 模型模式由 `MALL_AGENT_MODEL_MODE` 控制：`openai`（默认，需要真实 Key）或
   `stub`（离线演示，不需要 Key）。占位 Key 会让聊天接口返回 503，不会被当成可用模型；
 - `MALL_AGENT_OPENAI_BASE_URL` 应填写服务商提供的 HTTP(S) 基础地址，服务端会保留路径并追加
@@ -723,6 +786,106 @@ powershell -ExecutionPolicy Bypass -File document\docker\check-agent-env.ps1
 退出码：`0` 通过、`1` 存在未通过项、`2` 找不到 `.env`。
 脚本只输出变量名与失败原因，不输出任何变量值。
 
+> **当前运行状态（重要）**
+>
+> - 历史 **2026-09-25** 构建的镜像中，`AgentHealthConfiguration` 的 `portalHealthProbe` /
+>   `redisHealthProbe` 是固定返回 `false` 的占位实现，当时容器 `/health/ready` 实测**恒为
+>   503 + `{"status":"DOWN"}`**，与 Redis、`mall-portal` 是否可达无关；这只是**旧镜像**行为，
+>   不代表当前源码。
+> - **2026-09-26 当天本机 Docker daemon 一度不可用**——这是**当轮当时**的历史事实，**不是**当前状态。
+>   其后 daemon 已恢复：2026-09-25 替换出的旧 Java 容器 `b39c8d3193d1`
+>   （`mall-local-mall-shopping-agent-1`）**仍为 healthy**。
+> - **历史轮次：首次重建尝试（当轮当时，已被后续更正取代）**：按**当前源码**（真实探针 + 固定 `2s`
+>   Redis 超时）重建新镜像的**首次**尝试（**默认网络**）在 `document/docker/Dockerfile.app` 的
+>   `mvn ... package` 阶段**长时间无新输出**，**由主 Agent 主动中止该未完成构建（命令退出码 1）**——
+>   **不是** Maven 编译失败，也**未**查明为网络原因；当时**旧容器 `b39c8d3193d1` 未被替换**。
+> - **宿主机 JAR 已实测（2026-09-26）**：本工作树最新 JAR 在 `127.0.0.1:18086` 以 stub 模式临时启动
+>   （门户 `127.0.0.1:8085` + 真实 Redis `127.0.0.1:16379/0`），`/health/live` 与 `/health/ready` 均
+>   **200 UP**；仅把 Redis 指向 `127.0.0.1:1/0` 时 `/health/ready` **503 DOWN**（约 0.44 秒）、
+>   `/health/live` 仍 **200 UP**；两个临时进程已停止。
+> - **后续更正（2026-09-26，新镜像已重建并在容器运行中验证）**：
+>   - 改用 **host 网络**重建成功：`docker build --network=host --progress=plain -f document/docker/Dockerfile.app
+>     --build-arg MODULE=mall-agent --build-arg JAR_FILE=mall-agent-1.0-SNAPSHOT.jar --build-arg APP_PORT=8086
+>     -t mall-local/mall-shopping-agent:local .` → **exit 0、Maven BUILD SUCCESS**，镜像
+>     **`sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`**。
+>   - 以 `MALL_AGENT_MODEL_MODE=stub`（进程环境）配合 `.env.example` 执行
+>     `docker compose --env-file .env.example --profile app --profile edge up -d --no-deps --no-build mall-shopping-agent`
+>     → **exit 0**，**仅重建目标服务**；新容器
+>     **`2077801e5c7487df666aade6ebddc3e48a1b4f32a3a70ff70da27bcf2f925a63`、healthy**；
+>     Redis / mall-portal / Nginx 容器 **ID 不变且 healthy**。
+>   - 实测：直连 `8086` `/health/live` 与 `/health/ready` 均 **200 UP**；经 Nginx `8088` 的
+>     `/agent-api/health/live` 与 `/agent-api/health/ready` 亦均 **200 UP**；`nginx -t` **exit 0**、
+>     Compose **全 profile `config --quiet` exit 0**。
+>   - 因此**新镜像的真实就绪探针已在容器运行中验证**，**不再**称「未验证」。**遗留**：`/agent/chat`
+>     因会写 Redis 会话 / 限流键**未调用**；真实模型 / 会员券 / 微信真机仍**未验证**；
+>     **Task 12 Step 4 保持 `[ ]`（部分完成）**、**Task 13 仍未完成**。本轮无 SQL / Redis 业务写，
+>     未 commit / push / merge。
+>
+> - **后续更正（2026-09-27，E2E 验收轮；Task 12 Step 4 已勾选 `[x]`）**：Docker daemon
+>   **29.5.3 已恢复**；本轮开始前与清理后，原 Compose **13 个服务均 healthy**。原 Compose
+>   `mall-shopping-agent` 容器 ID 短前缀 **`2077801e5c74`**、镜像 SHA
+>   `sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`（标签指向本 Java
+>   worktree），**本轮未被替换**；直连 `/health/live`、`/health/ready` 与主 Nginx `8088` 的
+>   `/agent-api/health/live`、`/agent-api/health/ready` **均 200**，主 Nginx `nginx -t` 成功。
+>   `mvn -o -f mall-master/pom.xml -pl mall-agent -am -DskipTests package` **exit 0**；尝试构建
+>   独立 tag `mall-local/mall-shopping-agent:e2e-20260927` 时 `document/docker/Dockerfile.app` 的
+>   Maven 步骤**约 3 分钟无新输出**，由主 Agent **Ctrl+C 中止**——**不是** Maven 编译失败，
+>   **也**未声称已查明网络原因。
+> - **E2E 路径说明（重要）**：本轮 `/agent-api/agent/chat` 的实测走的是**临时隔离 app/Nginx**
+>   （`eclipse-temurin:17-jre` 临时容器只读挂载当前 JAR、临时 Nginx 只读挂载项目
+>   `document/docker/nginx/conf.d/default.conf`、独立临时 Redis DB15 无持久化），
+>   **不是**主 Nginx `8088` 的 chat 调用；主栈 chat 端到端仍未直接验收。临时环境实测：stub 下
+>   `/agent-api/agent/chat` 对真实门户公开搜索 **HTTP 200**、**5 张门户商品卡**
+>   （`id`/`name`/`price`/`stockStatus`/`availableStock`/`detailPath` 均非空），session GET
+>   **2 条消息 / 5 张卡**、DELETE `deleted=true`，游客个人券问题 `requiresLogin=true` 且无卡片；
+>   另以 env 白名单起临时 live one-off 容器加做一条「推荐一款手机」真实模型公开查询 **HTTP 200**、答案非空。
+>   临时容器/网络与测试端口 `18086`/`18087`/`18088`/`18089`、Redis `16380` 均已清理（现无监听）；
+>   该 E2E **只写被删除的隔离 Redis**，未调用共享 Redis，未做 MySQL 写、优惠券领取、购物车、
+>   订单、支付、库存修改或 ES 写。
+> - **2026-09-27 测试与审查**：全量 `mvn -o -q -f mall-master/pom.xml test`（当次进程级
+>   `MALL_AGENT_TEST_REDIS_URL` 指向独立临时 Redis）Surefire **72 份报告合计
+>   Tests=1243 / failures=0 / errors=0 / skipped=0**，**8 个真实 Redis 门控用例确实运行**；
+>   测试 Redis DB15 结束 `dbsize=0`、容器移除；`git diff --check` **exit 0**。安全审查：
+>   业务/聊天**窄范围**审查**无 P0/P1/P2**（`RedisRateLimiterTest` Javadoc 旧并发语义已由
+>   CodeBuddy 修正，**纯注释**）；部署边界审查**无 P0/P1**、有 **4 个待决 P2**（见下）。两项
+>   **宽范围** CodeBuddy 审查曾**超 240 秒终止、无输出**，后续窄范围复核才返回上述结果，
+>   **不得**声称全面审查无问题。
+> - **3 个待决 P2（仅登记，未修复）**：`Dockerfile.app` runtime **未指定 `USER`**（root 运行）；
+>   agent 同在 `mall-net` 可连**无认证** ES/Mongo 等基础服务（代码当前**不使用**这些客户端，
+>   **不代表**网络层已隔离）；`ClientIpResolver` **信任 `X-Real-IP`**（外部经 Nginx 会被覆盖，
+>   但**本机直连 / 同网容器可伪造**分桶）。
+> - **本轮静态加固（2026-09-27，仅改 Compose / `.env.example` / 测试 / 本文档，未运行容器）**：
+>   上述后两个 P2 已在 **Compose 静态配置**层面收敛——Agent 移出 `mall-net`、只接入
+>   `agent-proxy-net` 与 `agent-backend-net`，并以固定 `MALL_AGENT_TRUSTED_PROXY_IP=172.21.240.2`
+>   只信任固定的 Nginx 对端；`mall-shopping-agent` 另加 `user: "10001:10001"` 以非 root 运行。
+>   第一个 P2 仍**部分存在**：`Dockerfile.app` 运行阶段仍**未指定 `USER`**，仅 agent 服务在
+>   Compose 层覆盖为非 root，`mall-admin` / `mall-search` / `mall-portal` 仍以镜像默认用户运行。
+>   **重要**：以上均为**静态校验**结论（`docker compose config` 渲染 + pytest 结构断言），
+>   **未**通过启动或替换任何容器验证实际网络隔离与非 root 运行；按本轮约定**不重建、不重启容器**。
+> - **已修复 P2（2026-09-27 后续返工，仅改部署默认值）**：原「Compose 与 `AgentProperties` 默认
+>   **CORS `*`**」已收敛——`docker-compose.yml` 与 `.env.example` 的 `MALL_AGENT_CORS_ALLOW_ORIGINS`
+>   默认改为**留空**（fail-closed：同源 H5 经 Nginx `/agent-api/` 不需要 CORS，跨域直连须显式填写精确
+>   来源，不再有 `:-*` 通配兜底）；`AgentProperties` 本就默认空并在配置阶段拒绝 `*`。
+> - **遗留**：**用户个人券真实会员 Token 未测**、**微信真机未测**；**Task 12 Step 4 已勾选 `[x]`**、
+>   **Task 13 仍未完成**（不因静态检查通过而标完成）。本轮**仅改文档**，未改 Java / 测试 / Compose /
+>   Nginx / `.env`，未 commit / push / merge。
+>
+> - **最新更正（2026-09-27，收窄共享 `Dockerfile.app` 运行身份后）**：上方 2026-09-27 静态加固轮中
+>   「`Dockerfile.app` 运行阶段仍**未指定 `USER`**，仅 agent 服务在 Compose 层覆盖为非 root」**已被取代**：
+>   `Dockerfile.app` runtime 现新增 `ARG APP_RUN_USER=root` / `ARG APP_HOME=/root`（**默认 root /
+>   `HOME=/root`**）；`mall-admin` / `mall-search` / `mall-portal` 不传参，**保持 root 与 `HOME=/root`**
+>   （**不是**非 root），仅 `mall-shopping-agent` 传 `APP_RUN_USER=mallapp` + `APP_HOME=/app` 并保留
+>   `user: "10001:10001"`。即 Agent 运行身份为**镜像 build args + Compose user 双重约束**。
+>   **重要（不得误述）**：旧镜像 `sha256:284512f8…` 属于本轮 ARG/HOME 变更**之前**构建，**不能**作为
+>   当前最终 `Dockerfile.app` 镜像生效的证据；变更后最终镜像**两次构建均未成功**（第一次 `apt` 阶段
+>   Docker BuildKit EOF；第二次 Docker Desktop Linux Engine `_ping` **500**），**尚未生成新镜像**，
+>   daemon 随后只读 `docker version` / `docker ps` 卡住已中止等待。故当前 `Dockerfile.app` **仅静态/测试
+>   层通过**（全 `pytest` **158 passed**、Compose 默认与全 profile `config --quiet` **exit 0**、
+>   `git diff --check` **exit 0**；见 `.codebuddy/reports/java-agent-only-nonroot-report.md`），真实镜像
+>   `User` / `HOME` 待 Docker 恢复后重验；旧临时 E2E 仍是**旧版本**的有效运行证据，Java 业务代码未变。
+>   主 Agent 正请求用户决定是否允许**重启 Docker Desktop**（**重启会影响主 Compose，未批准前不得自行
+>   重启**）。本轮**仅改文档**，未执行 SQL、未输出密钥、未操作主 Compose、未 commit / push / merge。
+
 验证：
 
 ```powershell
@@ -732,8 +895,13 @@ curl.exe http://localhost:8086/agent/chat -X POST -H "content-type: application/
   -d '{\"sessionId\":\"2dc7b03e-7368-4d6a-a8ef-b0ea16f6c92c\",\"message\":\"推荐一下手机\"}'
 ```
 
-`/health/ready` 需要 Redis 与 `mall-portal` 都可达；模型 Key 缺失不影响就绪，
-只影响 `/agent/chat`（返回 503）。
+`/health/ready` 的语义见 4.7：**当前源码**已注册两个**真实探针**——门户**固定匿名只读**
+`GET /product/search?pageNum=1&pageSize=1` 与 Redis 只读 `PING`（Redis `connect-timeout` 与
+`timeout` 均固定 `2s`）——**两者均健康时返回 200 UP，否则 503 / `{"status":"DOWN"}`**。
+**2026-09-26 已用新镜像替换目标容器并实测**：直连 `8086` 与经 Nginx `8088` 的
+`/health/live`、`/health/ready` 均 **200 UP**（详见本节上方「当前运行状态」的后续更正）。
+`/health/live` 返回 200 **仅能确认进程存活**，不能单独证明聊天业务可用；
+模型 Key 缺失只影响 `/agent/chat`（返回 503），不影响探针结果。
 
 Nginx（`edge` profile）通过 `/agent-api/` 反向代理到本服务：
 
@@ -756,6 +924,72 @@ docker exec mall-local-redis-1 redis-cli -n 0 del "<key>"
 游客与会话使用 `mall:agent:session:guest:<sessionId>`，
 登录会员使用 `mall:agent:session:member:<memberId>:<sessionId>`，
 持有有效 Token 时游客会话会迁移到会员命名空间并删除游客键。
+
+**回滚到 Python v1 运行时**（仅在 Java 实现验收失败、且用户确认后执行）：
+
+> **先区分两种状态（命令不同）**
+>
+> - **当前状态（Java 尚未合并入 `main`）——直接回滚**：Java 迁移改动只存在于工作树
+>   `F:\code\mall\.worktrees\java-agent-migration`；主仓库 `F:\code\mall\docker-compose.yml`
+>   **仍是原 Python 构建**（`context: ./mall-shopping-agent` +
+>   `dockerfile: ../document/docker/Dockerfile.agent`，无 build args），且 `F:\code\mall\.env`、
+>   Python 构建上下文与 `document/docker/Dockerfile.agent` 均存在。此时**无需修改任何 Compose 文件**，
+>   直接回到主仓库用真实本机 `.env` 重建目标服务即可恢复 Python 运行容器：
+>
+>   ```powershell
+>   Set-Location F:\code\mall
+>   docker compose --env-file .env --profile app up -d --no-deps --build mall-shopping-agent
+>   ```
+>
+>   `--no-deps` 只操作 `mall-shopping-agent`，不重建依赖或其他应用；命令只引用 `.env` 路径，
+>   **不读取、不输出**其中任何值。**不要**改用本工作树的 Java Compose，也**不要**用
+>   `.env.example`（它只含占位值）。
+>
+> - **将来状态（Java 已合并入 `main`）**：主仓库 `docker-compose.yml` 会变为 Java 构建，
+>   那时才需要先按下面第 1–2 项还原 Python build 段与 Python healthcheck，再执行第 5 项
+>   **同一条只重建目标服务**的命令（仍用真实本机 `.env`，不输出其内容）。
+
+**等 Java 合并入 `main` 后**，回滚才需要改文件：把 `docker-compose.yml` 的 `mall-shopping-agent`
+服务块还原为 Python 版本。
+仓库中 `document/docker/Dockerfile.agent`、`mall-shopping-agent/` 源码与
+`mall-shopping-agent/.dockerignore` 均已保留，不需要恢复任何被删除或改动的文件。
+以下第 1–4 项是**将来合并入 main 后**需要还原的 4 类配置，第 5 项是构建与重启命令
+（除这 4 类配置外，其余服务字段新旧一致）：
+
+1. **build 段**：改回 `context: ./mall-shopping-agent` +
+   `dockerfile: ../document/docker/Dockerfile.agent`，并**删除** Java 版新增的 build args
+   （`MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086`，
+   以及运行身份 ARG `APP_RUN_USER=mallapp`、`APP_HOME=/app`）。
+   旧 `Dockerfile.agent` 不声明任何 `ARG`，传入这些参数不会报错但完全被忽略，删除是为了避免误导。
+   `image: ${AGENT_IMAGE:-mall-local/mall-shopping-agent:local}` 新旧一致，不用改。
+2. **healthcheck**：改回镜像内 **Python 标准库**探测（Python 运行镜像**没有 curl**，
+   不能用 curl 探针；`Dockerfile.agent` 里的 `HEALTHCHECK` 会被 Compose 的 healthcheck 覆盖）：
+
+   ```text
+   CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8086/health/live', timeout=5).status == 200 else 1)"
+   ```
+
+   `interval: 15s` / `timeout: 10s` / `retries: 10` / `start_period: 30s` 与旧版一致。
+3. **environment**：两种做法都可以——
+   （a）原样保留 23 个 `MALL_AGENT_*`（Python 端会忽略它不认识的变量，不影响启动）；
+   （b）还原为旧版 13 个 + `TZ`：`MALL_AGENT_HOST`、`MALL_AGENT_PORT`、`MALL_AGENT_LOG_LEVEL`、
+   `MALL_AGENT_MODEL_MODE`、`MALL_AGENT_OPENAI_BASE_URL`、`MALL_AGENT_OPENAI_MODEL`、
+   `MALL_AGENT_OPENAI_API_KEY`、`MALL_AGENT_OPENAI_TIMEOUT_SECONDS`、
+   `MALL_AGENT_REQUEST_TIMEOUT_SECONDS`、`MALL_AGENT_MAX_TOOL_ROUNDS`、
+   `MALL_AGENT_SESSION_TTL_SECONDS`、`MALL_AGENT_PORTAL_BASE_URL`、`MALL_AGENT_REDIS_URL`。
+   注意 `MALL_AGENT_REQUEST_TIMEOUT_SECONDS` 在旧版同样是固定 `"35"`，不要放宽。
+4. **其它字段**：`profiles: ["app"]`、`ports`（`127.0.0.1:${AGENT_PORT:-8086}:8086`）、
+   `depends_on`（`redis` 与 `mall-portal` 均 `service_healthy`）、`restart` 新旧一致，不用改。
+   **注意 `networks` 与 `user` 已与 Python 版不同**：Java 版把 Agent 移出 `mall-net`，改为只接入
+   `agent-proxy-net`（静态地址 `172.21.240.3`）与 `agent-backend-net`，并新增 `user: "10001:10001"`。
+   回滚为 Python 版时应把该服务的 `networks` 还原为 `- mall-net` 并**删除** `user` 字段；
+   顶层 `agent-proxy-net` / `agent-backend-net` 在不被其它服务引用时可一并删除。
+5. 改完后在 `F:\code\mall` 执行
+   `docker compose --env-file .env --profile app up -d --no-deps --build mall-shopping-agent`
+   重建并重启该 service（只用真实本机 `.env`，**不输出其内容**；`--no-deps` 不重建依赖或其他应用）。
+
+执行前先只读确认现有容器状态与将被替换的容器，
+不要在验收失败时盲目重建共享服务或清理 volume。
 
 ---
 
@@ -1301,7 +1535,7 @@ wsl -d docker-desktop sysctl -w vm.max_map_count=262144
 | `pull access denied` / `request canceled` / 连接超时 | Docker Hub 不可达，见 2.3（加速器 / 镜像变量 / `docker image load`） |
 | 构建阶段 `apt-get: not found` | 运行阶段基础镜像被换成了非 Debian 系镜像，见 2.2，恢复为 `eclipse-temurin:17-jre` |
 | 构建阶段 Maven 依赖下载失败 | Maven 仓库不可达，见 2.3 末尾 |
-| `docker compose build` 报找不到 Dockerfile 或上下文过大 | 确认在仓库根目录执行；确认根目录 `.dockerignore` 存在并排除了 `node_modules` / `target` / `.git` |
+| `docker compose build` 报找不到 Dockerfile 或上下文过大 | 确认在仓库根目录执行；确认根目录 `.dockerignore` 存在并排除了 `node_modules` / `target` / `.git`（目录）/ `.git`（linked worktree 的链接文件）/ `.worktrees` |
 | 首次构建很慢 | 需要下载全部 Maven 依赖，属正常现象；后续构建会复用缓存 |
 
 ### 12.6 其他
@@ -1325,9 +1559,9 @@ wsl -d docker-desktop sysctl -w vm.max_map_count=262144
 
 - `docker compose --env-file .env.example config --quiet` 通过；
 - `docker compose --env-file .env.example --profile app --profile edge --profile observability config --quiet` 通过；
-- 解析后的配置中共有 **12 个服务带 ports、17 条发布端口**，默认 `host_ip` 全部为 `127.0.0.1`；
+- 解析后的配置中共有 **13 个服务带 ports、18 条发布端口**，默认 `host_ip` 全部为 `127.0.0.1`；
 - 显式设置 `MINIO_BIND_ADDR=0.0.0.0` 与 `NGINX_BIND_ADDR=0.0.0.0` 后，只有
-  MinIO 9000 / 9001 与 Nginx 8088 变成 `0.0.0.0`，其余 14 条仍为 `127.0.0.1`；
+  MinIO 9000 / 9001 与 Nginx 8088 变成 `0.0.0.0`，其余 15 条仍为 `127.0.0.1`；
 - `mall-admin` 解析后的环境变量中 `MINIO_ENDPOINT=http://minio:9000`、
   `MINIO_PUBLIC_ENDPOINT=http://localhost:9000`，两者已分离；
 - `check-env.ps1` / `check-env.sh` 三种路径行为一致：占位值 → 1，已替换值 → 0，

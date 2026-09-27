@@ -1,0 +1,25 @@
+# 商品导购智能体服务配置。
+# 只在这里声明 Spring 自身的映射；业务配置全部由 AgentProperties 按精确的 MALL_AGENT_* 变量名读取。
+# 本文件不得出现任何 API Key、Token 或密码。
+server:
+  address: ${MALL_AGENT_HOST:0.0.0.0}
+  port: ${MALL_AGENT_PORT:8086}
+
+spring:
+  application:
+    name: mall-agent
+  # 请求体中出现未知字段（身份、Token、URL、工具控制字段等）必须直接拒绝，不能静默忽略
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  data:
+    redis:
+      url: ${MALL_AGENT_REDIS_URL:redis://localhost:6379/0}
+      # 固定 Redis 超时：Redis 不可达时连接建立与命令读写都必须在有限时间内失败，
+      # 避免启动装配或 /health/ready 探针被默认超时拖住。这里刻意不使用环境变量占位符。
+      connect-timeout: 2s
+      timeout: 2s
+
+logging:
+  level:
+    com.macro.mall.agent: ${MALL_AGENT_LOG_LEVEL:INFO}

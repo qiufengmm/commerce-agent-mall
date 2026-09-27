@@ -1,6 +1,40 @@
 # mall-shopping-agent
 
-Mall 商品导购智能体（第一版）。基于 Python 3.11 + FastAPI，通过服务商基础地址下的
+> **状态（2026-09-25）：本目录的 Python 实现已不再是 Compose 的运行实现。**
+>
+> 当前 `docker-compose.yml` 里的 service key `mall-shopping-agent`（`app` profile、
+> 容器端口 `8086`、宿主机绑定 `127.0.0.1:${AGENT_PORT:-8086}:8086`、
+> `depends_on: redis(healthy) + mall-portal(healthy)`、Nginx `/agent-api/` →
+> `mall-shopping-agent:8086`）由 **Java 17 的 `mall-master/mall-agent`** 提供。
+> 构建方式：仓库根 context `.` + `document/docker/Dockerfile.app`，
+> build args `MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086`；
+> 容器内 healthcheck 用运行镜像内已安装的 `curl -fsS http://127.0.0.1:8086/health/live`。
+> 运行镜像为 `eclipse-temurin:17-jre`，启动命令是 `java -jar /app/app.jar`。
+>
+> 本目录的 Python 源码、测试和下面的运行说明作为 v1 参考实现保留
+> （`document/docker/Dockerfile.agent` 与 `mall-shopping-agent/.dockerignore` 同样保留），
+> **Compose 不再构建或运行它们**。
+>
+> 临时回滚到 Python 运行时按状态区分（完整步骤见 `document/docker/local-startup.md` §4.7）：
+>
+> - **当前状态（Java 尚未合并入 `main`）——直接回滚**：主仓库 `F:\code\mall\docker-compose.yml`
+>   仍是原 Python 构建，**无需修改任何文件**；回到主仓库，用它现有的 Python Compose 与本机 `.env`
+>   重建目标服务即可恢复 Python 运行容器：
+>
+>   ```powershell
+>   Set-Location F:\code\mall
+>   docker compose --env-file .env --profile app up -d --no-deps --build mall-shopping-agent
+>   ```
+>
+> - **将来状态（Java 已合并入 `main`）**：才需要先按 §4.7 还原 Python build 段与 Python
+>   healthcheck，再执行上面同一条命令。
+>
+> **不要**用本工作树的 Java Compose 配合 `.env.example`（仅含占位值）做回滚。
+>
+> Java 运行手册见 `document/docker/local-startup.md` 第 4.7 节；
+> 实施计划见 `docs/superpowers/plans/2026-09-23-java-product-shopping-agent.md`。
+
+Mall 商品导购智能体 v1（Python 参考实现）。基于 Python 3.11 + FastAPI，通过服务商基础地址下的
 `/chat/completions` 接口进行受控工具调用，并且只通过 HTTP 读取 `mall-portal`
 的公开与会员只读接口。
 
@@ -62,7 +96,36 @@ mall-shopping-agent/
 | `GET /agent/session/{sessionId}` | 恢复最近 20 条消息与最近一组商品卡片 |
 | `DELETE /agent/session/{sessionId}` | 清空当前身份命名空间的会话，幂等 |
 | `GET /health/live` | 进程可响应即 200 |
-| `GET /health/ready` | Redis 与 `mall-portal` 探针成功时 200；模型 Key 缺失不阻止就绪 |
+| `GET /health/ready` | Redis 与 `mall-portal` 探针成功时 200（本目录 Python v1 参考实现；Java 源码亦已实现等价语义，见下方说明）；模型 Key 缺失不阻止就绪 |
+
+> **当前 Java 源码的 ready 行为（2026-09-26）**：Java 版（`mall-master/mall-agent`）的
+> `AgentHealthConfiguration` 已注册两个**真实探针**——门户探针复用 `MallPortalClient` 已配置超时，
+> 发送**固定匿名只读** `GET /product/search?pageNum=1&pageSize=1`（HTTP 200 + 业务 `code=200` +
+> `data.total` 非负整数）；Redis 探针惰性取连接执行只读 `PING`（期望 `PONG`，`connect-timeout`
+> 与 `timeout` 均固定 `2s`）。**两者均健康时 `/health/ready` 返回 200 UP，否则 503 DOWN**；探针
+> 只在 `/health/ready` 请求时访问依赖。故上表「Python 探针成功时 200」描述的是本目录 Python v1
+> 参考实现，Java 版现也已具备等价就绪语义。
+>
+> **历史与验证边界**：2026-09-25 **旧镜像**的探针是 `() -> false` 占位实现，当时实测**恒为
+> 503 + `{"status":"DOWN"}`**，与 Redis / `mall-portal` 可达性无关——那只是**旧镜像**行为。
+> **2026-09-26 当天 Docker daemon 一度不可用**——这是**当轮当时**的历史事实，**不是**当前状态；
+> 其后 daemon 已恢复。按当前源码重建新镜像的**首次**尝试（**默认网络**）在 `mvn ... package`
+> 阶段**长时间无新输出**，**由主 Agent 主动中止该未完成构建（命令退出码 1，不是编译失败）**，
+> **当轮旧容器未被替换**——**已被下列更正取代**。
+>
+> **后续更正（2026-09-26，新镜像已重建并在容器运行中验证）**：改用 **host 网络**重建成功——
+> `docker build --network=host --progress=plain -f document/docker/Dockerfile.app --build-arg MODULE=mall-agent
+> --build-arg JAR_FILE=mall-agent-1.0-SNAPSHOT.jar --build-arg APP_PORT=8086 -t mall-local/mall-shopping-agent:local .`
+> **exit 0、Maven BUILD SUCCESS**，镜像 **`sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`**；
+> 以 `MALL_AGENT_MODEL_MODE=stub`（进程环境）+ `.env.example` 执行
+> `docker compose --env-file .env.example --profile app --profile edge up -d --no-deps --no-build mall-shopping-agent`
+> **exit 0**，**仅替换目标服务**；新容器 **`2077801e5c7487df666aade6ebddc3e48a1b4f32a3a70ff70da27bcf2f925a63`、healthy**，
+> Redis / mall-portal / Nginx 容器 **ID 不变且 healthy**。实测：直连 `8086` `/health/live` 与 `/health/ready` 均 **200 UP**；
+> 经 Nginx `8088` 的 `/agent-api/health/live` 与 `/agent-api/health/ready` 亦均 **200 UP**；`nginx -t` exit 0、
+> Compose 全 profile `config --quiet` exit 0。故**新镜像的真实就绪探针已在容器运行中验证**，不再称「未验证」。
+> **遗留**：`/agent/chat` 因会写 Redis 会话 / 限流键**未调用**；真实模型 / 会员券 / 微信真机仍**未验证**；
+> Task 12 Step 4 保持 `[ ]`（部分完成），Task 13 仍未完成。本轮无 SQL / Redis 业务写，未 commit / push / merge。
+> `/health/live` 返回 200 **仅能确认进程存活**，不能单独证明聊天业务可用，不要把它当作唯一就绪判据。
 
 会话键：
 
@@ -92,6 +155,11 @@ mall:agent:rate:ip:<ipHash>:<window>
 
 ## 4. 环境变量
 
+> 下表描述的是本目录的 Python v1 参考实现；`MALL_AGENT_*` 变量名与语义在 Java
+> `mall-agent` 的 `AgentProperties` 中保持一致。当前 Java 运行实现支持的全部 22 个
+> `MALL_AGENT_*` 变量、Compose 注入和默认值见 `docker-compose.yml` 与 `.env.example`；
+> `MALL_AGENT_TEST_REDIS_URL` 是 Python 侧测试专用变量，不出现在 Java 实现中。
+
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `MALL_AGENT_MODEL_MODE` | `openai` | `openai` 或 `stub`；默认必须是 `openai` |
@@ -110,12 +178,15 @@ mall:agent:rate:ip:<ipHash>:<window>
 模型兼容要求：只支持非流式响应；如果兼容服务不支持工具调用，聊天接口返回
 503，不会退化为让模型凭空回答商品事实。
 
-## 5. 本地运行
+## 5. 本地运行（Python v1 参考实现）
+
+> 以下 5.1 / 5.2 是 Python 参考实现的本机启动步骤，已不再用于 Compose。
+> 当前 Java 实现的构建与启动见 `document/docker/local-startup.md` 第 4.7 节。
 
 ### 5.1 Stub 模式（无需任何模型 Key）
 
 ```powershell
-Set-Location F:\code\mall\.worktrees\product-shopping-agent\mall-shopping-agent
+Set-Location F:\code\mall\mall-shopping-agent
 C:\Users\<you>\.workbuddy\binaries\python\versions\3.11.9\python.exe -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 
@@ -142,15 +213,18 @@ $env:MALL_AGENT_OPENAI_MODEL = '<模型名>'
 
 ### 5.3 Docker Compose 与 Nginx
 
-见 `document/docker/local-startup.md`。容器内 `MALL_AGENT_PORTAL_BASE_URL` 为
-`http://mall-portal:8085`，`MALL_AGENT_REDIS_URL` 为 `redis://redis:6379/0`，
-宿主机端口默认只绑定 `127.0.0.1`。
+本节只适用于回滚到 Python 运行时之后；当前 Compose 构建的是 Java `mall-agent`，
+详见本文件顶部状态说明和 `document/docker/local-startup.md`。
+
+无论运行实现是 Java 还是 Python，容器内 `MALL_AGENT_PORTAL_BASE_URL` 都是
+`http://mall-portal:8085`，`MALL_AGENT_REDIS_URL` 都是 `redis://redis:6379/0`，
+宿主机端口默认只绑定 `127.0.0.1`，Nginx `/agent-api/` 都代理到 `mall-shopping-agent:8086`。
 
 ### 5.4 移动端
 
 H5 开发环境把 `VITE_AGENT_API_BASE_URL` 指向 `http://localhost:8086`；
 Nginx 环境使用 `/agent-api`（Nginx 反向代理到 `mall-shopping-agent:8086`，
-`proxy_read_timeout 40s`）。微信小程序构建使用同一变量，具体地址按联调环境填写。
+`proxy_read_timeout 60s`，覆盖最多 10 秒门户身份解析和 35 秒请求编排预算）。微信小程序构建使用同一变量，具体地址按联调环境填写。
 
 ### 5.5 Redis 会话清理
 

@@ -1,0 +1,18 @@
+# 应用上下文隔离测试使用的 test profile（计划 Task 11 Step 1）。
+#
+# 目的：让「真实启动 Spring 上下文」的集成测试完全不依赖外部中间件。
+#
+# 这里只排除 Redis 自动配置：本模块的隔离测试不应创建 RedisConnectionFactory，
+# 更不应在启动阶段隐式连接任何 Redis。StringRedisTemplate 由测试配置类
+# （MallAgentApplicationTest.RedisSubstitute）提供 Mockito 替身补齐装配，
+# 会话仓储与限流器因此仍能构建，但不持有真实连接。
+#
+# 被排除的两个类都是 spring-boot-autoconfigure 中真实存在的自动配置候选；
+# 若排除一个不存在的类，Spring Boot 会因「无法排除非自动配置类」而直接启动失败。
+#
+# 本文件不包含任何地址、凭据或环境变量取值。
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration

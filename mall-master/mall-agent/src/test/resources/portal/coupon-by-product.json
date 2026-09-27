@@ -1,0 +1,44 @@
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 55,
+      "type": 0,
+      "name": "满500减50",
+      "platform": 0,
+      "count": 100,
+      "amount": 50.00,
+      "perLimit": 1,
+      "minPoint": 500.00,
+      "startTime": "2024-01-01T00:00:00.000Z",
+      "endTime": "2030-01-01T00:00:00.000Z",
+      "useType": 0,
+      "note": "满500减50"
+    },
+    {
+      "id": 77,
+      "type": 0,
+      "name": "满2000减200",
+      "platform": 0,
+      "count": 50,
+      "amount": 200.00,
+      "perLimit": 1,
+      "minPoint": 2000.00,
+      "startTime": "2024-01-01T00:00:00.000Z",
+      "endTime": "2030-01-01T00:00:00.000Z",
+      "useType": 2,
+      "note": "指定商品可用"
+    },
+    {
+      "id": 99,
+      "type": 0,
+      "name": "未领取的全场券",
+      "amount": 10.00,
+      "minPoint": 0.00,
+      "startTime": "2024-01-01T00:00:00.000Z",
+      "endTime": "2030-01-01T00:00:00.000Z",
+      "useType": 0
+    }
+  ]
+}
