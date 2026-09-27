@@ -80,7 +80,9 @@ services:
       retries: 10
       start_period: 10s
     networks:
+      # 保留 mall-net 供其它服务使用，另加入 agent-backend-net 供 Agent 只读会话存取。
       - mall-net
+      - agent-backend-net
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -401,30 +403,76 @@ services:
       retries: 15
       start_period: 120s
     networks:
+      # 保留 mall-net 供其它服务使用，另加入 agent-backend-net 供 Agent 只读调用 /product/search。
       - mall-net
+      - agent-backend-net
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # app profile：商品导购智能体（Python 3.11 + FastAPI，只读）
+  # app profile：商品导购智能体（Java 17 / mall-agent，只读）
   # ---------------------------------------------------------------------------
+  # 运行实现是 mall-master/mall-agent（Spring Boot，Java 17），由 Dockerfile.app 构建；
+  # mall-shopping-agent/ 下的 Python 源码与历史测试仅作参考，Compose 不再构建它。
   # 只通过 HTTP 调用 mall-portal 的五个只读接口，不直连 MySQL / MongoDB /
   # RabbitMQ / Elasticsearch，也不执行任何 SQL；会话与限流状态放在 Redis。
   # 安全约定：
   #   1. 不挂载根 .env，只注入 MALL_AGENT_* 白名单变量，
   #      避免把基础设施凭据带进 agent 容器；
   #   2. 模型凭据只来自 .env，占位值会被服务端与环境校验脚本拒绝；
-  #   3. 宿主机端口默认只绑定 127.0.0.1。
+  #   3. 宿主机端口默认只绑定 127.0.0.1；
+  #   4. 网络分段：只接入 agent-proxy-net（Nginx 可达）与 agent-backend-net
+  #      （Redis / mall-portal 可达），不接入共享 mall-net。注意这只是按服务名 / DNS 的
+  #      分段，不构成「看不到数据库」的强隔离：Docker Desktop 下主栈服务经宿主机已发布
+  #      端口（ES / MongoDB / MySQL）仍可达，共享的无认证 Redis 也仍然可达；
+  #   5. 只信任固定对端 Nginx（MALL_AGENT_TRUSTED_PROXY_IP，与 Nginx 静态地址逐字一致）；
+  #   6. 只有本服务以固定非 root UID/GID 运行（user: 10001:10001）。
   mall-shopping-agent:
     profiles: ["app"]
     image: ${AGENT_IMAGE:-mall-local/mall-shopping-agent:local}
+    # 仅本服务以非 root 运行：Dockerfile.app 的运行身份由 ARG APP_RUN_USER 选择，
+    # 这里显式传入 mallapp（UID:GID 10001:10001），使 Agent 镜像 Config.User=mallapp；
+    # 进程 HOME 同样由 ARG APP_HOME 选择，这里传入 /app，与 mallapp 的 passwd home 一致。
+    # 复用同一 Dockerfile.app 的其它服务不传这两个参数，保持镜像默认 root 与 HOME=/root。
+    # 运行镜像不依赖写入 /app，健康探针与只读业务均不需要 root 权限。
+    user: "10001:10001"
     build:
-      context: ./mall-shopping-agent
-      dockerfile: ../document/docker/Dockerfile.agent
+      # 使用仓库根作为构建上下文，复用 Java 多阶段构建模板编译 mall-agent 模块。
+      # 需要回到 Python 旧实现时，按计划回滚为
+      # context: ./mall-shopping-agent + dockerfile: ../document/docker/Dockerfile.agent。
+      context: .
+      dockerfile: document/docker/Dockerfile.app
+      args:
+        MODULE: mall-agent
+        JAR_FILE: mall-agent-1.0-SNAPSHOT.jar
+        APP_PORT: "8086"
+        # 选择运行时用户：只有 Agent 传入 mallapp 以非 root 运行；默认 root 供其它服务使用。
+        APP_RUN_USER: mallapp
+        # 选择进程 HOME：只有 Agent 传入 /app，与 mallapp 的 passwd home 一致；
+        # 三个复用同一 Dockerfile.app 的服务不传，保持基础镜像默认的 /root。
+        APP_HOME: /app
     environment:
       TZ: Asia/Shanghai
+      # 与 AgentProperties.ENVIRONMENT_VARIABLES 一一对应的 23 个白名单变量。
+      # 只注入白名单变量，不整体 env_file，避免把数据库/中间件凭据带进 agent 容器。
+      # 配置契约（与 .env.example 的 A/B 两段逐项一致，不可漂移）：
+      #   A. 宿主可调（7 个）：以 ${VAR:-默认值} 插值，宿主 .env 可覆盖 ——
+      #      LOG_LEVEL / CORS_ALLOW_ORIGINS / MODEL_MODE / OPENAI_BASE_URL /
+      #      OPENAI_MODEL / OPENAI_API_KEY / SESSION_TTL_SECONDS。
+      #   B. Compose 容器固定值（16 个）：直接写死字面量，不读取宿主 .env 覆盖；
+      #      安全 / 超时 / 限流参数刻意固定，例如 REQUEST_TIMEOUT_SECONDS 固定 35；
+      #      同一服务内门户身份解析最多再占 10 秒（PORTAL_TIMEOUT_SECONDS 固定 10），
+      #      Nginx 对 /agent-api/ 的 proxy_read_timeout 为 60 秒，覆盖「身份解析 10 秒
+      #      + Agent 请求 35 秒」的服务端总预算，35 秒严格小于该值。
       MALL_AGENT_HOST: "0.0.0.0"
       MALL_AGENT_PORT: "8086"
       MALL_AGENT_LOG_LEVEL: ${MALL_AGENT_LOG_LEVEL:-INFO}
+      # 浏览器同源经 Nginx /agent-api/ 访问不需要 CORS；默认留空表示不授权任何跨域来源，
+      # 不使用 :-* 通配兜底。需要跨域直连时，在宿主 .env 显式填写精确来源（逗号分隔）。
+      MALL_AGENT_CORS_ALLOW_ORIGINS: ${MALL_AGENT_CORS_ALLOW_ORIGINS:-}
+      # 唯一可信反向代理地址：只有请求对端与该值按地址字节相等时才采信 X-Real-IP。
+      # 固定为 Nginx 在 agent-proxy-net 上的静态地址，不读宿主 .env，避免被覆盖后信任错误对端。
+      MALL_AGENT_TRUSTED_PROXY_IP: "172.21.240.2"
+      MALL_AGENT_REQUEST_TIMEOUT_SECONDS: "35"
       # openai（默认，需要真实 Key）或 stub（无 Key 离线演示）
       MALL_AGENT_MODEL_MODE: ${MALL_AGENT_MODEL_MODE:-openai}
       MALL_AGENT_OPENAI_BASE_URL: ${MALL_AGENT_OPENAI_BASE_URL:-https://api.openai.com/v1}
@@ -432,11 +480,19 @@ services:
       # 允许为空：为空时聊天接口返回 503，不会让模型凭空回答商品事实
       MALL_AGENT_OPENAI_API_KEY: ${MALL_AGENT_OPENAI_API_KEY:-}
       MALL_AGENT_OPENAI_TIMEOUT_SECONDS: "30"
-      MALL_AGENT_REQUEST_TIMEOUT_SECONDS: "35"
       MALL_AGENT_MAX_TOOL_ROUNDS: "4"
-      MALL_AGENT_SESSION_TTL_SECONDS: ${MALL_AGENT_SESSION_TTL_SECONDS:-86400}
+      # 只读调用 mall-portal，使用容器服务名而不是宿主机地址
       MALL_AGENT_PORTAL_BASE_URL: http://mall-portal:8085
+      MALL_AGENT_PORTAL_TIMEOUT_SECONDS: "10"
       MALL_AGENT_REDIS_URL: redis://redis:6379/0
+      MALL_AGENT_SESSION_TTL_SECONDS: ${MALL_AGENT_SESSION_TTL_SECONDS:-86400}
+      MALL_AGENT_SESSION_MAX_MESSAGES: "20"
+      MALL_AGENT_RATE_LIMIT_SESSION_LIMIT: "20"
+      MALL_AGENT_RATE_LIMIT_SESSION_WINDOW_SECONDS: "300"
+      MALL_AGENT_RATE_LIMIT_IP_LIMIT: "60"
+      MALL_AGENT_RATE_LIMIT_IP_WINDOW_SECONDS: "300"
+      MALL_AGENT_TOOL_RESULT_MAX_CHARS: "4000"
+      MALL_AGENT_CONTEXT_MAX_CHARS: "16000"
     ports:
       - "127.0.0.1:${AGENT_PORT:-8086}:8086"
     depends_on:
@@ -446,18 +502,31 @@ services:
       mall-portal:
         condition: service_healthy
     healthcheck:
-      # 使用 Python 标准库探测存活接口，镜像内不需要额外安装 curl
+      # Dockerfile.app 运行镜像已通过 apt-get 安装 curl，直接探测存活接口。
+      # Compose healthcheck 依然只探 /health/live（进程存活即 200），不探 /health/ready：
+      # /health/ready 由 AgentHealthConfiguration 注册的真实探针决定——Redis PING 与
+      # mall-portal 只读查询均健康时返回 200，任一失败即 503；把它用作容器探针会在依赖
+      # 异常（Redis 或门户短暂不可用）时把容器标为 unhealthy，混淆进程存活与依赖就绪
+      # （普通 Compose 的 healthcheck 不会因 unhealthy 自动重启容器），因此存活探针
+      # 与就绪语义分开：依赖是否就绪由 /health/ready 单独对外暴露。
       test:
         - CMD
-        - python
-        - -c
-        - import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8086/health/live', timeout=5).status == 200 else 1)
+        - curl
+        - -fsS
+        - http://127.0.0.1:8086/health/live
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 30s
     networks:
-      - mall-net
+      # 只接入专网：经 agent-proxy-net 被 Nginx 反向代理，经 agent-backend-net 访问
+      # Redis 与 mall-portal；不接入共享 mall-net。该分段仅按服务名 / DNS 隔离，
+      # 不是「看不到数据库」的强隔离：Docker Desktop 下主栈服务经宿主机已发布端口
+      # （ES / MongoDB / MySQL）仍可达，共享的无认证 Redis 也仍然可达。
+      # agent-proxy-net 上使用固定静态地址，便于用 MALL_AGENT_TRUSTED_PROXY_IP 精确比对 Nginx。
+      agent-proxy-net:
+        ipv4_address: 172.21.240.3
+      agent-backend-net:
     restart: unless-stopped
 
   # ===========================================================================
@@ -487,7 +556,11 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - mall-net
+      # 保留 mall-net 继续反向代理商城其它服务；加入 agent-proxy-net 代理 Agent，
+      # 并用固定静态地址 172.21.240.2 作为 Agent 唯一可信的代理对端。
+      mall-net:
+      agent-proxy-net:
+        ipv4_address: 172.21.240.2
     restart: unless-stopped
 
   # ===========================================================================
@@ -545,7 +618,23 @@ services:
 # 网络与数据卷
 # =============================================================================
 networks:
+  # 共享网络：Nginx 与原有商城服务（含 MySQL/MongoDB/ES 等无认证基础设施）都接在这一层。
   mall-net:
+    driver: bridge
+
+  # Agent 专用代理网络：普通 bridge + 固定子网，只接入 Nginx 与 Agent。
+  # 固定静态地址让 Agent 能逐字比对可信代理对端：Nginx=172.21.240.2，Agent=172.21.240.3。
+  # 该子网 172.21.240.0/29 已只读复核：本机现有网段为 172.17.0.0/16、172.18.0.0/16、
+  # 172.19.0.0/16、172.20.0.0/16，与本子网不重叠。
+  agent-proxy-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.240.0/29
+
+  # Agent 后端网络：普通 bridge。不能设置 internal=true，
+  # 否则 Agent 失去调用外部模型 API 的出网能力；只接入 Agent / Redis / mall-portal。
+  agent-backend-net:
     driver: bridge
 
 volumes:

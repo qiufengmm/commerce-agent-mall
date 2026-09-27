@@ -1,5 +1,73 @@
 # Mall Python 商品导购智能体设计
 
+> **状态备注（2026-09-25）：本文档是 Python v1 的设计记录，现作为参考保留。**
+>
+> 当前 Compose 的运行实现已切换为 Java 17 的 `mall-master/mall-agent`；对外边界不变——
+> service key 仍是 `mall-shopping-agent`、容器端口 `8086`、宿主机绑定 `127.0.0.1`、
+> `depends_on` 为 Redis 与健康的 `mall-portal`、Nginx `/agent-api/` 仍代理到
+> `mall-shopping-agent:8086`。构建方式改为仓库根 context `.` +
+> `document/docker/Dockerfile.app`（`MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、
+> `APP_PORT=8086`），运行镜像 `eclipse-temurin:17-jre`，healthcheck 用 `curl /health/live`。
+>
+> 下文出现 FastAPI / Uvicorn / Python 运行时与「独立 Python Dockerfile」的段落均为历史设计，
+> 不代表当前运行事实。Java 实施计划见
+> `docs/superpowers/plans/2026-09-23-java-product-shopping-agent.md`，
+> 运行手册见 `document/docker/local-startup.md` 第 4.7 节。
+>
+> **补充（2026-09-26，Java runtime）**：当前 Java **源码**（`mall-master/mall-agent`）的
+> `AgentHealthConfiguration` 已把 `portalHealthProbe` / `redisHealthProbe` 改为**真实探针**：
+> 门户探针复用 `MallPortalClient` 已配置超时，发送**固定匿名只读** `GET /product/search?pageNum=1&pageSize=1`
+> （校验 HTTP 200 + 业务 `code=200` + `data.total` 为非负整数）；Redis 探针惰性取连接执行只读
+> `PING`（期望 `PONG`，Redis `connect-timeout` 与 `timeout` 均固定 `2s`）。`ReadinessService`
+> 要求全部探针健康，**两者均健康时 `/health/ready` 返回 200 UP，否则 503 DOWN**；探针只在
+> `/health/ready` 请求时访问依赖，启动阶段不建连。§6.4 下文「Redis 与 mall-portal 可连接时
+> 返回 200」现已由真实探针实现。
+>
+> **历史与验证边界（重要）**：2026-09-25 构建的**旧镜像**中两个探针仍是 `() -> false` 占位
+> 实现，当时容器 `/health/ready` 实测**恒为 503 + `{"status":"DOWN"}`**，与 Redis / mall-portal
+> 是否可达无关——该 503 仅是**旧镜像**行为，不代表当前源码。**2026-09-26 当天 Docker daemon
+> 一度不可用**——这是**当轮当时**的历史事实，**不是**当前状态；其后 daemon 已恢复，2026-09-25
+> 替换出的旧 Java 容器 `b39c8d3193d1`（`mall-local-mall-shopping-agent-1`）**仍为 healthy**。
+> 但按**当前源码**重建新镜像的**首次**尝试（**默认网络**）在 `document/docker/Dockerfile.app` 的
+> `mvn ... package` 阶段**长时间无新输出**，**由主 Agent 主动中止该未完成构建（命令退出码 1，不是编译失败）**，
+> **当时旧容器未被替换**——这是**当轮当时**的状态，**已被下列更正取代**。
+>
+> **后续更正（2026-09-26，新镜像已重建并在容器运行中验证）**：改用 **host 网络**重建成功——
+> `docker build --network=host --progress=plain -f document/docker/Dockerfile.app --build-arg MODULE=mall-agent
+> --build-arg JAR_FILE=mall-agent-1.0-SNAPSHOT.jar --build-arg APP_PORT=8086 -t mall-local/mall-shopping-agent:local .`
+> **exit 0、Maven BUILD SUCCESS**，镜像 **`sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`**；
+> 以 `MALL_AGENT_MODEL_MODE=stub`（进程环境）+ `.env.example` 执行
+> `docker compose --env-file .env.example --profile app --profile edge up -d --no-deps --no-build mall-shopping-agent`
+> **exit 0**，**仅替换目标服务**；新容器 **`2077801e5c7487df666aade6ebddc3e48a1b4f32a3a70ff70da27bcf2f925a63`、healthy**，
+> Redis / mall-portal / Nginx 容器 **ID 不变且 healthy**。实测：直连 `8086` `/health/live` 与 `/health/ready` 均 **200 UP**；
+> 经 Nginx `8088` 的 `/agent-api/health/live` 与 `/agent-api/health/ready` 亦均 **200 UP**；`nginx -t` exit 0、
+> Compose 全 profile `config --quiet` exit 0。故**新镜像的真实就绪探针已在容器运行中验证**，不再称「未验证」。
+> **遗留**：`/agent/chat` 因会写 Redis 会话 / 限流键**未调用**；真实模型 / 会员券 / 微信真机仍**未验证**；
+> Task 12 Step 4 保持 `[ ]`（部分完成），Task 13 仍未完成。本轮无 SQL / Redis 业务写，未 commit / push / merge。
+>
+> **最终更正（2026-09-27，E2E 验收轮）**：Docker daemon **29.5.3 已恢复**；本轮开始前与清理后原 Compose
+> **13 个服务均 healthy**。原 Compose `mall-shopping-agent` 容器 ID 短前缀 **`2077801e5c74`**、镜像 SHA
+> `sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`（标签指向本 Java worktree），
+> **本轮未被替换**；直连与主 Nginx `8088` 的 `/health/live`、`/health/ready` **均 200**，主 Nginx `nginx -t` 成功。
+> `mvn -o -f mall-master/pom.xml -pl mall-agent -am -DskipTests package` **exit 0**；尝试构建独立 tag
+> `mall-local/mall-shopping-agent:e2e-20260927` 时 `document/docker/Dockerfile.app` 的 Maven 步骤**约 3 分钟无新
+> 输出**，由主 Agent **Ctrl+C 中止**（**不是** Maven 编译失败，**未**声称查明网络原因）。随后以
+> `eclipse-temurin:17-jre` 临时容器只读挂载当前 JAR、独立临时 Redis（DB15、无持久化）与临时 Nginx
+> （只读挂载项目 `document/docker/nginx/conf.d/default.conf`）完成 E2E：stub 下 `/agent-api/agent/chat`
+> 对真实门户公开搜索 **HTTP 200 / 5 张门户商品卡**（字段均非空），session GET **2 条消息 / 5 张卡**、
+> DELETE `deleted=true`，游客个人券问题 `requiresLogin=true` 且无卡片；另以 env 白名单起临时 live one-off
+> 容器加做一条「推荐一款手机」真实模型公开查询 **HTTP 200**、答案非空。**实测路径是临时隔离 app/Nginx，
+> 不是主 Nginx chat 调用**。全量测试 Surefire **72 份报告合计 Tests=1243 / 0 failure / 0 error / 0 skip**
+> （**8 个真实 Redis 门控用例确实运行**）；`git diff --check` exit 0。临时容器/网络与测试端口
+> `18086`–`18089`、Redis `16380` 已清理（现无监听）；该 E2E **只写被删除的隔离 Redis**。**遗留**：
+> **3 个待决 P2**（`Dockerfile.app` runtime 未指定 `USER`（root 运行）；agent 同在 `mall-net` 可连
+> **无认证** ES/Mongo 等基础服务（代码当前不使用这些客户端，**不代表**网络层隔离）；
+> `ClientIpResolver` **信任 `X-Real-IP`**，本机直连 / 同网容器可伪造分桶）；原「Compose 与
+> `AgentProperties` 默认 **CORS `*`**」P2 已于 **2026-09-27 后续返工修复**（`docker-compose.yml` 与
+> `.env.example` 的 `MALL_AGENT_CORS_ALLOW_ORIGINS` 默认改为留空 fail-closed，不再有 `:-*` 通配兜底）；
+> **真实会员 Token 未测**、**微信真机未测**；**Task 12 Step 4 已勾选 `[x]`**、**Task 13 仍未完成**。
+> 本轮**仅改文档**，未改 Java / 测试 / Compose / Nginx / `.env`，未 commit / push / merge。
+
 > 状态：已批准（2026-09-22）
 > 日期：2026-09-22
 > 适用范围：第一版可演示的移动端商品导购，不包含任何交易写操作
@@ -191,7 +259,26 @@ Python 基线为 3.11。核心依赖限定为 FastAPI、Uvicorn、Pydantic、pyd
 ### 6.4 健康检查
 
 - `GET /health/live`：进程可响应即返回 200；
-- `GET /health/ready`：Redis 和 `mall-portal` 可连接时返回 200；模型 Key 未配置不阻止容器启动，但聊天接口返回 503。
+- `GET /health/ready`：Redis 和 `mall-portal` 可连接时返回 200（**Python v1 设计目标；Java 源码已由真实探针实现，见文首补充（2026-09-26）**）；模型 Key 未配置不阻止容器启动，但聊天接口返回 503。
+
+> **当前 Java 源码行为（2026-09-26）**：`/health/live` 恒 200（Java 实现亦如此）；
+> `/health/ready` 由 `AgentHealthConfiguration` 注册的两个**真实探针**决定——门户探针发送
+> **固定匿名只读** `GET /product/search?pageNum=1&pageSize=1`（HTTP 200 + 业务 `code=200` +
+> `data.total` 非负整数），Redis 探针执行只读 `PING`（期望 `PONG`，`connect-timeout` 与
+> `timeout` 均固定 `2s`）；**两者均健康则 200 UP，否则 503 + `{"status":"DOWN"}`**。探针只在
+> `/health/ready` 请求时访问依赖，启动阶段不建连。上文「可连接时返回 200」现已由真实探针实现。
+>
+> **历史与验证边界**：2026-09-25 **旧镜像**的两个探针是 `() -> false` 占位实现，当时实测**恒 503**，
+> 与 Redis / mall-portal 可达性无关——那只是**旧镜像**行为。**2026-09-26 当天 Docker daemon 一度不可用**
+> （**当轮当时**的历史事实，**不是**当前状态）；其后 daemon 已恢复。按当前源码重建新镜像的**首次**尝试
+> （**默认网络**）在 `mvn ... package` 阶段长时间无新输出，**由主 Agent 主动中止该未完成构建（退出码 1，非编译失败）**，
+> **当轮旧容器未替换**。
+> 〔**后续更正（2026-09-26）**：改用 **host 网络**重建成功（**exit 0、Maven BUILD SUCCESS**，镜像
+> `sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`），并以 stub + `.env.example`
+> **仅替换目标服务**（新容器 `2077801e5c74…` healthy；Redis / mall-portal / Nginx ID 不变且 healthy）；
+> 直连 `8086` 与经 Nginx `8088` 的 `/health/live`、`/health/ready` 均 **200 UP**。**故新镜像真实就绪探针已在
+> 容器运行中验证，不再称未验证**；遗留 `/agent/chat`（会写 Redis 会话 / 限流键）未调用、真实模型 / 会员券 / 微信真机未验证。〕
+> `/health/live` 返回 200 **仅能确认进程存活**，不能单独证明聊天业务可用，不要把它当作唯一就绪判据。
 
 ## 7. 会话与身份
 
@@ -307,6 +394,8 @@ mall:agent:rate:ip:<ipHash>:<window>
 
 达到限制返回 HTTP 429，不调用模型。
 
+限流按两阶段执行：身份解析前先按真实客户端 IP 消耗一次 IP 桶（因此伪造 Token 也无法绕过 IP 维度，失效 Token 超 IP 配额时 429 且不访问门户身份接口与会话），身份确定后再按会员/游客会话键消耗一次会话桶。一次正常请求恰好各消耗一次 IP 与会话预算。并发防护按规范 sessionId 占用整个请求生命周期，因此同一 sessionId 的第二个并发聊天请求返回 409；该保护只在单实例进程内生效，多副本部署仍由前端防重复提交与限流共同覆盖。
+
 ### 10.4 日志
 
 结构化日志只记录：`traceId`、会话摘要、身份类型、工具名、耗时、结果状态、模型状态码和 Token 用量统计。禁止记录 API Key、Authorization、验证码、完整提示词、完整用户消息及完整模型响应。
@@ -335,12 +424,14 @@ Compose `app` profile 新增 `mall-shopping-agent`：
 
 - 容器端口 `8086`，默认仅绑定 `127.0.0.1`；
 - 依赖 Redis 和 `mall-portal` 健康；
-- 使用独立 Python Dockerfile；
+- ~~使用独立 Python Dockerfile~~（v1 历史设计；当前由仓库根的
+  `document/docker/Dockerfile.app` 以 `MODULE=mall-agent` 构建 Java 17 镜像）；
 - 健康检查访问 `/health/live`；
 - 不挂载源码和 `.env`；
 - Nginx 新增 `/agent-api/` 反向代理。
 
-环境变量：
+环境变量（v1 设计时的最小集合；当前 Java `AgentProperties` 支持 22 个
+`MALL_AGENT_*` 白名单变量，完整清单与默认值见 `docker-compose.yml` 和 `.env.example`）：
 
 ```text
 MALL_AGENT_OPENAI_BASE_URL

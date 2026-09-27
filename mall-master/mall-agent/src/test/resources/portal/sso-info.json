@@ -1,0 +1,13 @@
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 7,
+    "memberLevelId": 4,
+    "nickname": "示例会员",
+    "icon": "http://localhost:9000/mall/avatar.png",
+    "status": 1,
+    "integration": 1200,
+    "growth": 800
+  }
+}
