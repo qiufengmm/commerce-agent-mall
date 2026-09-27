@@ -747,4 +747,4 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **静态/动态验证**：本轮全 reactor Maven 1333 项，失败/错误 0、跳过 8（均为真实 Redis 门控用例，未配置独立测试 Redis）；Python Compose/Nginx 测试 163 passed；Compose 默认与全部 profile 配置均 exit 0；隔离 Nginx 实测 32k 限制（40k 请求 413）、无上游 502、日志不含测试 UUID；所有临时容器已清理，主 Compose 当前容器快照均 healthy。
 - **只读审查**：Java 与部署审查均无 Critical/Important；审查建议的 DELETE 可信代理正路径覆盖、嵌套 location 解析器与 Compose 超时注释已补齐。没有提交级阻断。
 - **尚未完成**：真实会员优惠券与微信真机、正式 HTTPS/小程序合法域名仍按用户决定暂缓；主栈 `8088` chat 的最新变更后 E2E 未在本轮执行；GET/DELETE 跨实例互斥仍未实现。
-- **Git**：工作分支尚未提交或合并；当前 main 基线 `56810c2`，待本轮创建中文提交并本地合并；不 push。
+- **Git**：已创建中文提交 `96bafb7`（实现 Java 商品导购智能体并完善部署安全）；功能工作树干净，待合并到 `main`。当前 main 基线 `56810c2`；不 push。
