@@ -785,13 +785,13 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **计划勾选状态**：**Task 12 Step 4 保持 `[x]`**；**Task 13 Step 2 保持 `[x]`**（含义为完整验收报告与未验证清单已记录，**不代表**微信真机 / 正式域名已验收）。
 - **Git 边界**：本轮**未执行任何 Git 写操作**（无 commit / push / merge / reset），未执行 SQL，未改代码 / 配置 / 测试。`main` 与 `origin/main` 均为 `ed5140a`。
 
-## 2026-09-28 工作树只读审查（`agent-live-acceptance`，待用户决定）
+## 2026-09-28 工作树只读审查（`agent-live-acceptance`，历史记录；当时待用户决定）
 
-- **对象**：`C:\Users\qiufengm\.codex\worktrees\agent-live-acceptance\mall`，分支 `codex/agent-live-acceptance`，HEAD `56810c2`；含 **6 个未提交的 Python 源/测试改动**，且**无对应这些改动的报告**。
+- **对象**：Codex 管理的 detached worktree，分支 `codex/agent-live-acceptance`，HEAD `56810c2`；含 **6 个未提交的 Python 源/测试改动**，且**无对应这些改动的报告**。
 - **定向 pytest**：因**缺少 `redis` 包**，`api/test_chat.py` 在**收集（collection）阶段即失败**，**该模块测试未执行**。
 - **不涉及 API 的两文件测试**（`safety` + `orchestrator`）：**共 61 项，59 通过、2 失败**——（1）「我这张券能用在这款商品上吗」**未命中**个人券意图；（2）「帮我领优惠券」被**错误命中**个人券意图。
-- **处置**：**禁止清理或丢弃该工作树**，标记为**待用户决定修复 / 归档**。
-- **其他工作树**：`codex/deepseek-base-url`、`codex/java-agent-migration` 均干净、分支提交已在 `main` 历史中，列为**待清理候选**（实际删除须由用户手动执行，项目规则禁止批量目录删除）；`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。
+- **处置（历史）**：当时**禁止清理或丢弃该工作树**，并标记为**待用户决定修复 / 归档**；该标记仅记录当时状态，当前处置见文末状态补记。
+- **其他工作树（历史记录）**：`codex/deepseek-base-url`、`codex/java-agent-migration` 的提交当时已在 `main` 历史中，并被列为**待清理候选**；该候选标记只表示当时状态，当前注册情况见文末状态补记（旧 worktree 不再注册，分支 ref 按记录保留）。`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。
 - **本轮边界**：本节为**纯文档更新**，未改 Java / Python / 前端 / Compose / Nginx / 配置 / 数据库，未执行 Git 集成操作，未清理任何 worktree。
 
 ## 2026-09-28 退役附记
@@ -800,9 +800,9 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 本计划正文（含「Python 源码保留为参考」与上文历史 worktree 记录）为**历史记录**，不再代表当前状态；历史内容不重写、不删除。
 当前收尾与验收进度见 `docs/superpowers/plans/2026-09-28-retire-python-shopping-agent.md`。
 
-## 2026-09-28 状态补记（只读 Git 快照校准）
+## 2026-09-28 状态补记（只读 Git 快照校准；历史快照）
 
-本节仅校准上文历史记录的**当前状态误读风险**，**不修改、不删除**任何原有审查记录、历史数字或其他段落；以下为按 2026-09-28 只读 Git 快照得出的事实，后续动态状态以实时 `git worktree list` / 分支 ref 为准。
+本节记录按 `main@29e45c6` 得出的 2026-09-28 只读快照，仅用于校准当时的历史状态误读风险，**不是当前快照**；其 ahead 8 和 worktree 注册状态已由后续提交取代，当前 Git 状态见 `docs/context/project-handoff.md` 顶部最新快照。以下内容不修改、不删除原有审查记录或历史数字；所有动态状态仍以实时 `git worktree list` / 分支 ref 为准。
 
 - **旧 worktree 已不再注册**：当前 `git worktree list` 中**没有** `agent-live-acceptance`、`deepseek-base-url`、`java-agent-migration` 对应的已登记工作树。因此上文「待用户决定修复 / 归档」（`agent-live-acceptance`）与旧 worktree「待清理候选」等表述**不再构成当前待办**：**旧 worktree 的注册 / 清理已不再是当前待办事项**。
 - **对应本地分支 ref 仍保留，提交已在 `main` 历史中**：这三个本地分支 ref 仍存在，各自 tip 均为 `main@29e45c6` 的**祖先**。逐一对应（`git rev-list --left-right --count main...<branch>`）：`codex/agent-live-acceptance` = `17 0`；`codex/deepseek-base-url` = `19 0`；`codex/java-agent-migration` = `14 0`。因此**无需再清理对应 worktree**；此事实**不代表**应删除这些分支 ref。
