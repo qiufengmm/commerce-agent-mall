@@ -750,7 +750,7 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **功能提交**：`96bafb7`（实现 Java 商品导购智能体并完善部署安全）；`5182cea`（记录 Java 智能体迁移提交信息）。
 - **本地合并**：`main` 以非快进方式合并，提交 `18b5408cb7076f98b3da38c61fec0e9a82fa067b`（合并 Java 商品导购智能体迁移），无冲突。
 - **合并后复验**：在 `main` 新跑全 reactor `mvn -o -q -f mall-master/pom.xml test`，exit 0；本轮 Surefire 新鲜报告合计 1333 项、0 失败、0 错误、8 跳过（真实 Redis 门控用例）；`python -m pytest tests/unit/docker/test_compose_config.py -q` 为 163 passed；Compose 默认配置和 app/edge/observability 全 profile 配置均 exit 0；`git show --check` 无空白错误。
-- **远程边界**：本次 2026-09-27 文档记录提交后，`origin/main` 跟踪引用为 `56810c2`，本地 `main` 比其超前 5 个提交；2026-09-28 主栈验收记录提交后将超前 6 个提交。未执行 push；提交后 `main` 工作区干净。
+- **推送结果**：用户确认后执行 `git push origin main`，exit 0，远端回执 `56810c2..fecc43a main -> main`；本地 `origin/main` 跟踪引用与 `HEAD=fecc43a` 一致，工作区干净。推送后的独立 `git ls-remote` 复核因 GitHub TLS 握手失败未取得新回执；没有 force push。
 
 ## 2026-09-28 主栈游客 E2E 与 Task 13 记录收尾
 
@@ -759,4 +759,4 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **副作用边界**：仅调用商品门户只读查询；无 SQL/MySQL 写、领券、购物车、订单、支付、库存或 ES 写。限流计数遵循既有 TTL。请求后单次 Compose 快照显示长期运行服务 healthy、`minio-init` 为预期 `Exited (0)`。
 - **计划勾选**：Task 13 Step 2 现标为完成，含义是完整验收报告与未验证清单已记录；不代表真实模型、会员优惠券、微信真机或正式域名已验收。主栈当前只完成 stub 游客流程。
 - **仍待人工/外部条件**：真实模型主栈调用、真实会员 Token/优惠券适用性、微信真机、正式 HTTPS/小程序合法域名，以及跨实例互斥评估；分网隔离并非严格出站隔离。
-- **Git**：功能和合并提交为 `96bafb7`、`5182cea`、`18b5408`；本次验收记录将在 `main` 另建中文文档提交。未 push。
+- **Git**：功能和合并提交为 `96bafb7`、`5182cea`、`18b5408`；主栈验收记录提交 `fecc43a` 已随 `main` 推送成功。推送命令返回成功，本地跟踪引用已更新；独立远端复核请求遇 TLS 握手失败。未 force push。
