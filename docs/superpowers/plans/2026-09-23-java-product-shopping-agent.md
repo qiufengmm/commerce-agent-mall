@@ -645,6 +645,8 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 
 预期：生成 `.codebuddy/reports/java-product-shopping-agent-report.md`；聊天只回执报告路径、实现状态、阻塞和 Git 状态。之后由主 Agent 按 AGENTS.md 执行审查、中文提交和本地合并；推送必须另行取得用户明确确认。
 
+> **当前勾选语义（以 2026-09-28 当前有效结论为准）**：本步现为 `[x]`，含义是**完整验收报告与未验证清单已记录**；**不代表**微信真机 / 正式域名已验收——**微信开发者工具 / 真机验收仍需用户扫码配合，当前未完成**。真实模型主栈与会员优惠券验收已由 2026-09-28 单独完成（见文末当前有效结论）。下方 2026-09-25 / 2026-09-26 的状态段为**该时点历史记录**。
+
 **Step 2 状态（2026-09-25）**：**保持未勾选**。完整验收报告 `.codebuddy/reports/java-product-shopping-agent-report.md` **尚未生成**；真实模型 / 真实会员 Token / 微信真机 / `/agent/chat` 运行时链路均未验证，**Task 13 仍未完成**。**原因更新（2026-09-25 Compose service replacement 验收轮）**：本段原写「Task 12 Step 3 / Step 4 仍未关闭（Java 镜像缺 `docker build` 退出码回执、Compose service replacement 未做、Nginx 运行时仍指向旧 Python 容器）」**已过时**——Task 12 **Step 3 已勾选完成**（`up --build` exit 0、Compose service 已替换为 Java 容器），**Step 4 部分完成**（保持 `[ ]`）：`nginx -t` 与经 Nginx `/agent-api/health/live` 200 已通过，但 `/health/ready` 恒 503 不能证明 Redis/portal 状态、`/agent-api/agent/chat` 因会写 Redis 未执行。故 Task 13 Step 2 未完成的当前原因是**整份验收报告未生成与余下未验证项**，而不再是 Step 3 阻塞。
 
 **Step 2 状态（2026-09-26 后续）**：已生成**当前阶段**总验收报告 `.codebuddy/reports/java-product-shopping-agent-report.md`（连同 `java-agent-readiness-report.md`），但 **Step 2 保持 `[ ]`、Task 13 仍未完成**——该报告如实标注未完成项而**不伪称完成**：新源码镜像重建未成功（停在 `Dockerfile.app` 构建阶段的 `mvn ... package`，退出码 1）、**旧容器未替换**、**新探针 ready 200 未运行验证**、**`/agent/chat` 聊天端到端未验收**、真实模型 / 真实会员 Token / 微信真机 / 真实 Redis（`MALL_AGENT_TEST_REDIS_URL` 未配置 → 8 项 skip）仍**未验证**。验证方面本轮实测 `mvn -o -f mall-master/pom.xml test` = **BUILD SUCCESS / 1229 run / 0 failure / 0 error / 8 skip**（mall-agent 893 / 8 skip）。详见两份报告与下方「Step 3 / Step 4 后续环境状态（2026-09-26 后续）」。〔**2026-09-26 最终更正**：本段「新探针 ready 200 未运行验证 / 旧容器未替换」已被后续轮次取代——新镜像已重建（host 网络，exit 0）并替换容器，`/health/ready` **200 UP**（直连与经 Nginx），见文末「最终状态」块。〕
@@ -688,15 +690,15 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 
 ---
 
-## 2026-09-27 加固后当前状态
+## 2026-09-27 加固后状态（**历史时点**，已被 2026-09-28 当前有效结论取代）
 
-> 本节为本计划**当前有效**的收尾状态（**追加**，不删改上文历史；上文各轮计数保留其执行时点口径）。引用报告：`.codebuddy/reports/java-agent-hardening-review-report.md`。
+> **历史时点说明（不得当作当前结论）**：本节记录 **2026-09-27 当轮**收尾状态（**追加**，不删改上文历史；上文各轮计数保留其执行时点口径）。本节内「**Task 13 Step 2 保持 `[ ]`、Task 13 仍未完成**」与「`main` = `origin/main` = `56810c2`」均为**该时点**记录：其后 2026-09-28 已将 **Task 13 Step 2 标为 `[x]`**（含义为完整验收报告与未验证清单已记录，**不代表**微信真机 / 正式域名已验收），且 **`main` = `origin/main` = `ed5140a`**。**当前有效 Task 状态与 Git 基线以文末「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」为准。** 引用报告：`.codebuddy/reports/java-agent-hardening-review-report.md`。
 
 - **分支与提交**：工作树 `F:\code\mall\.worktrees\java-agent-migration`、分支 `codex/java-agent-migration`，HEAD 仍为 `f7b822b`；`mall-agent/` 与本源计划文件仍为**未跟踪/未提交**，**尚未合并到 `main`**。主仓库 `main` 已由主 Agent 在既有授权下推送，`main` = `origin/main` = `56810c2805e099ac45f0422a881096dd532de760`（`Merge branch 'codex/deepseek-base-url'`），`main` 工作区干净、**无待推送提交**。
 - **部署边界 4 项 P2（代码/静态与单测层已处理；运行层已在临时隔离环境复验，主栈 chat 等仍未验收）**：
   1. **CORS fail-closed**：`AgentProperties.corsAllowOrigins` 默认空并拒绝通配 `*`；`AgentCorsConfiguration` 默认空时**不注册任何跨域许可**；`docker-compose.yml` 与 `.env.example` 的 `MALL_AGENT_CORS_ALLOW_ORIGINS` 默认留空，去掉 `:-*` 通配兜底。
   2. **非 root 运行**：`document/docker/Dockerfile.app` runtime 以固定 UID/GID `10001:10001`（`USER mallapp`）运行，Compose 中 `user: "10001:10001"` 与之一致。〔**2026-09-27 最新更正（收窄运行身份）**：该条已被收窄——`Dockerfile.app` runtime 现为 `ARG APP_RUN_USER=root` / `ARG APP_HOME=/root`（**默认 root / `HOME=/root`**）；`mall-admin` / `mall-search` / `mall-portal` 不传参，**保持 root 与 `HOME=/root`**（**不是**非 root）；**仅 `mall-shopping-agent`** 传 `APP_RUN_USER=mallapp` + `APP_HOME=/app` 并保留 `user: "10001:10001"`。Agent 运行身份现为**镜像 build args + Compose user 双重约束**。详见下方「最新更正（2026-09-27，收窄共享 Dockerfile 运行身份后）」。〕
-  3. **网络隔离**：Agent 只接入 `agent-proxy-net`（对 Nginx）与 `agent-backend-net`（对 Redis / mall-portal），**不再接入 `mall-net`**，看不到数据库等无关服务。
+  3. **网络隔离**：Agent 只接入 `agent-proxy-net`（对 Nginx）与 `agent-backend-net`（对 Redis / mall-portal），**不再接入 `mall-net`**（此为**代码/静态层**的网络分段；**运行层实测仅为分网隔离、非严格出站隔离**，见下条「最新独立运行验收」——`host.docker.internal` 仍可达主栈宿主发布端口，**不得**表述为「看不到数据库」）。
   4. **源 IP 信任边界**：`ClientIpResolver` 仅在请求对端 `remoteAddr` 与 `MALL_AGENT_TRUSTED_PROXY_IP` **按地址字节相等**时才采信 `X-Real-IP`；该变量**默认空 = 不信任任何代理**，且刻意不读取 `X-Forwarded-For`。
   - 以上均为**代码/静态与单元测试层**结论；**2026-09-27 独立运行验收轮已在临时隔离环境复验**：非 root 已在最新镜像运行层生效、分网拓扑已实测、经 Nginx 的源 IP 采信边界（伪造源 IP + IP 配额 1 → 第二次 `429`）与 Redis 门控已实测；**但主栈 chat、可信代理双客户端正路径与真实模型 / 会员 / 微信仍未验收**，且**仅分网隔离、非严格出站隔离**（见下条「最新独立运行验收（2026-09-27）」）。
 - **最新独立运行验收（2026-09-27，临时隔离环境；运行层实测）**：
@@ -713,7 +715,7 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **计数口径更正（重要）**：此前写入的「全 reactor 9 模块 **984 tests / 8 skipped**」（引自 `java-agent-hardening-review-report.md` 第 3.1 节）**实为「仅 `mall-agent` 一个模块」的用例数被误当成全 reactor 总数**；**全 reactor 总数为 1320**，`agent 984` 只是其中一个模块。历史各轮计数（1189 / 1229 / 1243 等）保留其执行时点口径，**不得与 1320 相加**。旧「984 / 8 skipped」属**无测试 Redis 的 agent 单模块**口径，与接独立临时 Redis 的 1320（0 skipped）是**不同运行**。
 - **历史运行证据（加固前，保留并标时间）**：2026-09-27 上午以**临时隔离 app/Nginx + 独立临时 Redis**完成公开聊天 E2E（stub 模式：`/agent-api/health/ready` 200、`/agent-api/agent/chat` HTTP 200 与 5 张门户商品卡、session GET 2 条消息/5 张卡、DELETE `deleted=true`、游客个人券 `requiresLogin=true` 且无卡），并经 env 白名单临时 live 容器加做一条真实模型公开查询（HTTP 200、答案非空）。这些属**最新安全加固前**的历史运行证据；**新加固后的主栈 `8088` `/agent-api/agent/chat` 与最新镜像运行时未复验**。〔**2026-09-27 更正**：最新加固后镜像已在**临时隔离环境**完成运行层复验（见上条「最新独立运行验收（2026-09-27）」）；**仍未复验的**是**主栈 `8088` 的 `/agent-api/agent/chat`** 与**可信代理双客户端正路径**。〕
 - **仍未完成 / 已暂缓**：**真实会员 Token / 个人券适用性**、**微信开发者工具 / 真机**未验收；正式 HTTPS 与微信小程序合法域名按用户此前决定**暂缓**。跨实例会话互斥**仍仅为进程内 guard**（`InFlightGuard`，无 Redis 锁），只有多副本需求确定后再评估分布式锁。历史可选 Elasticsearch 多实例 `importAll` 压力测试与 outbox/MQ 补偿机制**未执行**，不得视为已完成。
-- **计划勾选状态纪律**：**Task 12 Step 4 保持 `[x]`**（依据为**临时隔离 app/Nginx** 路径，非主栈 chat）；**Task 13 Step 2 保持 `[ ]`、Task 13 仍未完成**——不因本轮静态检查通过而标完成。
+- **计划勾选状态纪律（历史时点口径）**：**Task 12 Step 4 当时保持 `[x]`**（依据为**临时隔离 app/Nginx** 路径，非主栈 chat）；**Task 13 Step 2 当时保持 `[ ]`、Task 13 当时仍未完成**——当轮不因静态检查通过而标完成。〔**2026-09-28 后续更新**：Task 13 Step 2 现为 `[x]`；当前有效勾选状态以文末「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」为准。〕
 - **最新更正（2026-09-27，收窄共享 `Dockerfile.app` 运行身份后；仍未合并）**：用户明确批准收窄共享 Dockerfile 的运行身份——runtime 新增 `ARG APP_RUN_USER=root` 与 `ARG APP_HOME=/root`（**默认 root / `HOME=/root`**）；`mall-admin` / `mall-search` / `mall-portal` 的 Compose `build.args` 不传这两个参数，**保持迁移前的 root 身份与 `HOME=/root`**（**不得**写成非 root）；只有 `mall-shopping-agent` 传 `APP_RUN_USER=mallapp` + `APP_HOME=/app`，并保留 `user: "10001:10001"`。故 Agent 运行身份现为**镜像 build args + Compose user 双重约束**（不再是「仅由 Compose 覆盖用户」）。**静态证据**：TDD 红绿与 156 条静态用例、再加 HOME 返工后 **158** 条静态用例见 `.codebuddy/reports/java-agent-only-nonroot-report.md`；主 Agent 实测全 `pytest` **158 passed**、Compose 默认与全 profile `config --quiet` **exit 0**、`git diff --check` **exit 0**（上文「155 passed / 1320 tests」属**更早**的独立运行验收轮口径，保留其执行时点，**不与 158 相混**）。**重要（不得误述）**：旧镜像 `sha256:284512f8…` 是本轮 ARG/HOME 变更**之前**构建，**不能**作为**当前最终 `Dockerfile.app` 镜像**生效的证据；最终镜像新构建**两次均未成功**（第一次 `apt` 阶段 Docker BuildKit EOF；第二次 Docker Desktop Linux Engine `_ping` **500**），**尚未生成新镜像**，其后 daemon 只读 `docker version` / `docker ps` 卡住已中止等待。因此当前最新 `Dockerfile.app` **仅静态/测试层通过**，真实镜像 `User` / `HOME` 待 Docker 恢复后重验；旧临时 E2E（隔离环境）仍是**旧版本**的有效运行证据，Java 业务代码未变。**用户网络风险口径不变**（**仅分网隔离**、非严格出站隔离；`host.docker.internal` 可达主栈已发布 ES/Mongo/MySQL，共享无认证 Redis 同实例），用户已接受先记风险。主 Agent 正请求用户决定是否允许**重启 Docker Desktop**（**重启会影响主 Compose，未批准前不得自行重启**）。
 - **Git 纪律**：本节为**纯文档更新**，未执行 commit / push / merge / reset，未改 Java/Python 代码、测试、Compose、Dockerfile 或真实 `.env`，未执行 SQL、未做 Docker build/up/exec。
 - **最终镜像构建复验与聊天未完成（2026-09-27，Docker Desktop 重启后；追加，不改上文历史）**：
@@ -754,9 +756,40 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 
 ## 2026-09-28 主栈游客 E2E 与 Task 13 记录收尾
 
+> 〔**后续更新（当前有效）**：主 Compose 现已确认为 **`openai`（真实模型）**运行模式，且**主栈真实模型 + 会员优惠券验收已完成**；本节 `stub` 结论为**该时点**记录，保留为历史。**当前有效结论见文末「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」**。〕
+
 - **主栈配置**：运行中的 `mall-shopping-agent` 环境变量模式只读取到 `stub`；经主 Nginx `8088` 的 `/agent-api/health/live` 与 `/agent-api/health/ready` 均 HTTP 200。
 - **游客聊天**：使用本轮随机会话请求 `POST /agent-api/agent/chat`（“推荐一款手机”），HTTP/统一响应码均为 200，答案非空，返回 5 张商品卡，`requiresLogin=false`；会话 GET 返回 2 条消息；DELETE 返回 `deleted=true`，清理测试会话。未使用真实模型或会员凭据。
 - **副作用边界**：仅调用商品门户只读查询；无 SQL/MySQL 写、领券、购物车、订单、支付、库存或 ES 写。限流计数遵循既有 TTL。请求后单次 Compose 快照显示长期运行服务 healthy、`minio-init` 为预期 `Exited (0)`。
 - **计划勾选**：Task 13 Step 2 现标为完成，含义是完整验收报告与未验证清单已记录；不代表真实模型、会员优惠券、微信真机或正式域名已验收。主栈当前只完成 stub 游客流程。
 - **仍待人工/外部条件**：真实模型主栈调用、真实会员 Token/优惠券适用性、微信真机、正式 HTTPS/小程序合法域名，以及跨实例互斥评估；分网隔离并非严格出站隔离。
 - **Git**：功能和合并提交为 `96bafb7`、`5182cea`、`18b5408`；主栈验收记录提交 `fecc43a` 已随 `main` 推送成功。推送命令返回成功，本地跟踪引用已更新；独立远端复核请求遇 TLS 握手失败。未 force push。
+
+---
+
+## 2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）
+
+> 本节为本计划**当前有效的实测结论**（**追加**，不删改上文历史）。上文 2026-09-27 及更早各轮中「真实模型 / 真实会员券未验收」「主栈 `8088` chat 未验收」「Task 13 未完成」等状态，凡与本节冲突者，**以本节为准**。旧记录保留其执行时点口径。
+
+- **基线**：`main` = `origin/main` = `ed5140aeee81d2668300964093c30ff0ad616d89`（`记录商品导购智能体推送状态`），`main` 工作区干净。上文「`main` = `origin/main` = `56810c2`」为**历史基线**。
+- **主 Compose 运行模式**：对主 Compose `mall-shopping-agent` 做只读 `docker inspect` 并**仅筛选** `MALL_AGENT_MODEL_MODE`，确认运行模式为 **`openai`（真实模型）**。**未读取、未记录任何 API Key / Token / 会话 UUID。**
+- **主 Nginx H5 页面**：`http://localhost:8088`。
+- **登录态真实模型优惠券解释（H5）**：展示的优惠券解释与「已领取券」页**匹配**——**优惠金额、无门槛、指定商品范围、有效期**均正确。**未记录会员 ID 或任何凭据。**
+- **真实模型商品详情查询（H5）**：查询 iPhone 14 返回**售价 5999 元**，详情 SKU **合计可售库存 2394**；回答**主动披露**「列表页库存与详情页库存不一致」并**以详情页为准**。
+- **真实模型预算筛选（H5）**：按「手机售价不超过 4000 元」筛选，本次搜索返回 **5 件**，其中 **3 件在预算内**：红米 5A（649 元 / 库存 414）、小米 8（2699 元 / 库存 410）、华为 P20（3788 元 / 库存 1985）；两台超预算 iPhone **未进入推荐**；随后多轮追问**正确比较出华为 P20 库存最高**。（以上均为**查询时点数据**。）
+- **游客真实模型聊天（主 Nginx，无 Authorization）**：`POST /agent-api/agent/chat` 返回 **HTTP 200**、统一响应 `code=200`、`requiresLogin=false`、**答案非空**、**1 张商品卡**；本轮所用临时会话 `DELETE` 返回 `deleted=true`。
+- **诚实备注（不得编造）**：首次探测脚本的 **PowerShell 多行输出解析有误**，**不能**把其中 `-1` 记为接口失败；**首次会话清理的 DELETE 回执未成功解析**，其清理结果**不确定**，仅能说明服务会话存在 TTL 兜底；**不臆断**该会话已立即删除。
+- **副作用边界**：本轮**未执行任何 SQL、无代码改动**；H5 登录态对话产生了新增查询内容，留存在**短期会话**中。
+- **验收结论**：**真实模型主栈与会员优惠券验收已完成**。
+- **仍未完成（当前有效）**：**微信开发者工具 / 真机的商品导购端到端验收**（**需用户扫码配合**）；**正式 HTTPS / 小程序合法域名**按用户决定**暂缓**；`GET` / `DELETE` **跨实例互斥**仍为**可选技术遗留**（单实例已按当前目标验证）。
+- **计划勾选状态**：**Task 12 Step 4 保持 `[x]`**；**Task 13 Step 2 保持 `[x]`**（含义为完整验收报告与未验证清单已记录，**不代表**微信真机 / 正式域名已验收）。
+- **Git 边界**：本轮**未执行任何 Git 写操作**（无 commit / push / merge / reset），未执行 SQL，未改代码 / 配置 / 测试。`main` 与 `origin/main` 均为 `ed5140a`。
+
+## 2026-09-28 工作树只读审查（`agent-live-acceptance`，待用户决定）
+
+- **对象**：`C:\Users\qiufengm\.codex\worktrees\agent-live-acceptance\mall`，分支 `codex/agent-live-acceptance`，HEAD `56810c2`；含 **6 个未提交的 Python 源/测试改动**，且**无对应这些改动的报告**。
+- **定向 pytest**：因**缺少 `redis` 包**，`api/test_chat.py` 在**收集（collection）阶段即失败**，**该模块测试未执行**。
+- **不涉及 API 的两文件测试**（`safety` + `orchestrator`）：**共 61 项，59 通过、2 失败**——（1）「我这张券能用在这款商品上吗」**未命中**个人券意图；（2）「帮我领优惠券」被**错误命中**个人券意图。
+- **处置**：**禁止清理或丢弃该工作树**，标记为**待用户决定修复 / 归档**。
+- **其他工作树**：`codex/deepseek-base-url`、`codex/java-agent-migration` 均干净、分支提交已在 `main` 历史中，列为**待清理候选**（实际删除须由用户手动执行，项目规则禁止批量目录删除）；`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。
+- **本轮边界**：本节为**纯文档更新**，未改 Java / Python / 前端 / Compose / Nginx / 配置 / 数据库，未执行 Git 集成操作，未清理任何 worktree。
