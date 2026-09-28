@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. 遵循 Mall 手工 worktree 流程；不通过 MCP 自动分派编码子任务。步骤使用 `- [ ]` 复选框跟踪状态。
 >
-> **当前进度（2026-09-28）**：Task 0–8 **全部完成**（Task 8.2 随最终回执完成）。文末「实施后必须由主 Agent 审查的事项」中：**独立只读复核已通过、中文提交已创建（`df86cf5`）、本地合并已完成（`f908c32`）**；**仅 `push` 仍为待办，需用户明确确认**。删除由**用户手动执行**；助手的编辑限于文档与 Compose 注释。
+> **当前进度（2026-09-28 更新）**：Task 0–8 **全部完成**（Task 8.2 随最终回执完成）。文末「实施后必须由主 Agent 审查的事项」中：**独立只读复核已通过、中文提交已创建（`df86cf5`）、本地集成已完成（第一次合并 `f908c32`、计划文档补记提交 `c19bab8`、第二次合并 `fa8483c`，即当前 `main` HEAD）**；**仅 `push` 仍为待办，需用户明确确认**（本地 `main` 领先 `origin/main` **5 个提交，尚未推送**）。删除由**用户手动执行**；助手的编辑限于文档与 Compose 注释。
 >
-> **独立复核状态**：首轮独立只读复核（`gpt-6-luna`，推理强度 `max`）返回 **1 项 P1 + 2 项 P2**（文档口径），**均已修复**；**第二轮独立只读复核已通过**（首轮问题均已解决，暂未发现新阻断；第二轮 P3 非阻断建议——不应把保留分支 ref 编号放在「当前剩余任务」列表——**已通过移除重复列表项解决**）。**本地集成已完成**（功能提交 `df86cf5e41fa5778872ed5841c1e7d5fd32fba62`、合并提交 `f908c32055c537c6e8c467f83b30b690b5aad863`）；**仅 `git push` 仍未执行，需用户明确确认**。详见报告第 11 / 12 节与设计稿第 11 节。
+> **独立复核状态**：首轮独立只读复核（`gpt-6-luna`，推理强度 `max`）返回 **1 项 P1 + 2 项 P2**（文档口径），**均已修复**；**第二轮独立只读复核已通过**（首轮问题均已解决，暂未发现新阻断；第二轮 P3 非阻断建议——不应把保留分支 ref 编号放在「当前剩余任务」列表——**已通过移除重复列表项解决**）。**本地集成已完成**（功能提交 `df86cf5e41fa5778872ed5841c1e7d5fd32fba62`、第一次合并 `f908c32055c537c6e8c467f83b30b690b5aad863`、计划文档补记提交 `c19bab82d293414c566f38f23392b2f591fc6eef`、第二次合并 / 当前 `main` HEAD `fa8483c28820b3e71f98761118bb27406240d05f`）；**仅 `git push` 仍未执行，需用户明确确认**。详见报告第 11 / 12 节与设计稿第 11 节。
 
 **目标：** 从仓库中退役已不再运行的旧 Python 商品导购智能体实现（`mall-shopping-agent/` 目录与 `document/docker/Dockerfile.agent`），并同步更新仍指向旧 Python 资产的活动文档；保持 Java 运行时服务、对外契约、配置与前端完全不变。
 
@@ -89,7 +89,7 @@
   - 预期：上述检查全部通过后才进入 Task 1。
 - [x] **Step 0.6 — 核对旧 worktree 与分支 ref 状态（只读）**
   - 动作（PowerShell 7）：`git worktree list`；`git branch --list "codex/agent-live-acceptance"`
-  - 预期（本计划编写时实测）：`git worktree list` 仅含 `F:/code/mall`（main）与 `F:/code/mall/.worktrees/retire-python-agent`；旧 `C:/Users/qiufengm/.codex/worktrees/agent-live-acceptance/mall` **不在列表**；分支 ref `codex/agent-live-acceptance` **仍存在**（无远端对应，仅本地 ref）。
+  - 预期（本计划编写时实测）：`git worktree list` 仅含 `F:/code/mall`（main）与 `F:/code/mall/.worktrees/retire-python-agent`；旧 Codex 管理的 detached worktree **不在列表**；分支 ref `codex/agent-live-acceptance` **仍存在**（无远端对应，仅本地 ref）。
   - 停止条件：实际状态与此不同（例如旧 worktree 又出现在列表、或分支 ref 已消失）→ **停下并报告**；**不得**清理 worktree，**不得**删除任何 branch ref。
 
 ---
@@ -216,7 +216,7 @@
   - 预期：完成模块 #7 明确 Java-only。
 - [x] **Step 5.4 — 修正旧 `agent-live-acceptance` worktree 的历史状态**
   - 动作（先只读核对，PowerShell 7）：`git worktree list`；`git branch --list "codex/agent-live-acceptance"`
-    - 实测（本计划编写时）：`git worktree list` **仅**含 `F:/code/mall`（main）与 `F:/code/mall/.worktrees/retire-python-agent`；旧 `C:/Users/qiufengm/.codex/worktrees/agent-live-acceptance/mall` **已不在列表**（该旧 dirty worktree 已在此前授权清理）；分支 ref `codex/agent-live-acceptance` **仍存在**。
+    - 实测（本计划编写时）：`git worktree list` **仅**含 `F:/code/mall`（main）与 `F:/code/mall/.worktrees/retire-python-agent`；旧 Codex 管理的 detached worktree **已不在列表**（该旧 dirty worktree 已在此前授权清理）；分支 ref `codex/agent-live-acceptance` **仍存在**。
   - 动作（文档修改）：把 `docs/context/project-handoff.md` 中 `15`、`105`、`110`、`120` 行涉及该 worktree 的表述，从“**当前存在 / 待用户清理 / 禁止清理**”改为**历史说明**：
     - 该旧 worktree 曾含 **6 个未提交 Python 源/测试改动**（且无对应报告）；当时的相关审查与定向 pytest 结果**仅为历史**，**不得表述成当前测试结果**；
     - 当前该旧 worktree **已不在 `git worktree list`**，**不再作为清理待办**；其实际文件改动已随旧 worktree 被清理，**不在当前 Git 工作树**；
@@ -326,7 +326,7 @@
 
 > 以下均由主 Agent 完成，工作树不得自行执行 Git 写操作。**仅在以下全部通过后**才创建中文提交。
 >
-> **第二轮独立只读复核已通过**（首轮 1 P1 + 2 P2 均已解决；非阻断 P3 文案建议已通过移除重复待办项解决）。**上述第 1–8 项已由主 Agent 完成（含提交 `df86cf5` 与本地合并 `f908c32`）；仅第 9 项 `push` 仍为待办，需用户明确确认。**
+> **第二轮独立只读复核已通过**（首轮 1 P1 + 2 P2 均已解决；非阻断 P3 文案建议已通过移除重复待办项解决）。**上述第 1–8 项已由主 Agent 完成（含功能提交 `df86cf5`、第一次合并 `f908c32`、计划文档补记提交 `c19bab8`、第二次合并 / 当前 `main` HEAD `fa8483c`）；仅第 9 项 `push` 仍为待办，需用户明确确认（本地 `main` 领先 `origin/main` 5 个提交，尚未推送）。**
 
 1. **删除范围核验**：确认工作区删除项恰为 `mall-shopping-agent/`（74）与 `document/docker/Dockerfile.agent`（1）——这些删除由**用户手动执行**产生，助手未代删。主 Agent 审查时用 `git add -A` 暂存后读取 `git diff --cached --name-status` 复核，确认无其它意外改动。
 2. **Compose contract 审查**：确认 `docker-compose.yml` 变更**仅注释**；`mall-shopping-agent` service 仍为 Java 运行构建；profiles/端口/网络/依赖/healthcheck 未变。
@@ -342,6 +342,8 @@
 
 ## 2026-09-28 集成记录（本地合并）
 
+> **历史时点说明**：本节记录**第一次合并**当时的实测状态（`main` = `f908c32`、领先 3 个提交），**仅代表该时点**；其后的计划补记提交 `c19bab8` 与**第二次合并 `fa8483c`（当前 `main` HEAD）**见下方「2026-09-28 集成记录补记」。本节内容**保留原样以维持历史真实性，不改写**。
+
 - **用户选择**：集成选项 1 —— 本地合并到 `main`。
 - **功能提交**：`df86cf5e41fa5778872ed5841c1e7d5fd32fba62` ——「退役旧 Python 商品导购实现」。
 - **本地合并提交**：`f908c32055c537c6e8c467f83b30b690b5aad863` ——「合并旧 Python 商品导购退役」。
@@ -352,5 +354,22 @@
   - 合并前后主工作树 `git status` **clean**（无 working-tree changes）。
 - **origin 未改**：`origin/main` 仍为起始基线 `cd38a7367bb0c071f378e01e6baf05c81edb3cd5`；本地 `main` = `f908c32`、**领先 3 个提交**、**尚未推送**；`git push` 需用户明确确认。
 - **保留**：功能 worktree `F:\code\mall\.worktrees\retire-python-agent` 与分支 `codex/retire-python-agent` 均**保留**；**未清理** worktree / branch。
-- **本地残留（仅记录，未处理）**：`F:\code\mall\mall-shopping-agent/` 目录仍物理存在，但**无 tracked 文件**，仅剩被忽略的 `.pytest_cache/`、`.ruff_cache/`、`.venv/` 等本地缓存/虚拟环境目录；不影响 `git status` 干净状态。
+- **本地残留（时点化事实，未处理）**：**tracked Python 文件已从 Git 删除**；但 `F:\code\mall` **主工作树**仍有**被忽略的本地残留目录** `mall-shopping-agent/`（`git status --short --ignored` 显示整目录 `!!`，`git ls-files` 为 0），直接内容含 `.pytest_cache/`、`.ruff_cache/`、`.venv/`、`src/`、`tests/`：`src/` 下有 `mall_shopping_agent/` 目录骨架与 `mall_shopping_agent.egg-info/` 元数据，`tests/` 下有 integration/support/unit 等目录骨架；对 `src`/`tests` 的定向 `rg --files --hidden --no-ignore -g '*.py'` 扫描**无输出**（**未扫描 `.venv` 内部**）。该残留**仅存在于主工作树**（`retire-python-agent` 工作树、文档工作树与 Codex 管理的 detached worktree 内均不存在），**尚未清理**；不影响 `git status` 干净状态，也**不得据此推断所有工作树都只剩缓存**。
 - **说明**：提交 `df86cf5` 与合并 `f908c32` 由**主 Agent** 执行；本工作树助手未执行任何 Git 写操作。本文件此后的局部状态更新**不另建提交**。
+
+---
+
+## 2026-09-28 集成记录补记（计划文档补记提交与第二次合并）
+
+> **追加记录**（保留上文首次合并记录的历史真实性，不改写）。本节给出**退役任务最终集成状态**，并**取代**上方「集成记录（本地合并）」中的领先提交数等**时点性**数字。
+
+- **计划文档补记提交**：`c19bab82d293414c566f38f23392b2f591fc6eef` ——「补记旧 Python 导购退役集成记录」。
+- **第二次合并提交 / 当前 `main` HEAD**：`fa8483c28820b3e71f98761118bb27406240d05f` ——「合并退役任务集成记录」。
+- **origin 与领先情况**：`origin/main` 仍为起始基线 `cd38a7367bb0c071f378e01e6baf05c81edb3cd5`；本地 `main` = `fa8483c`，**领先 5 个提交**（`cd93893` / `df86cf5` / `f908c32` / `c19bab8` / `fa8483c`），**尚未推送**；`git push` 需用户明确确认。
+- **退役集成后 main 复验（新鲜运行，`main@fa8483c`）**：
+  - `mvn -o -f mall-master/pom.xml test` → **BUILD SUCCESS**、**9 个 reactor module**、**Tests run 997 / failures 0 / errors 0 / skipped 0**；
+  - 本轮以**独立临时 Redis**（loopback `127.0.0.1:16380`、DB15、禁用持久化）承载真实 Redis 门控用例，**定向 Redis 两个测试类 16/16 通过**（含门控解析用例），故本轮 **`skipped = 0`**；
+  - **历史口径保留（重要）**：上方「集成记录（本地合并）」中**未配置独立测试 Redis 时的 8 skipped** 仍为该时点的历史事实，**不得删改或表述为「当时没有 skip」**；
+  - 验收后临时 Redis `dbsize` = **0**，**精确停止并移除**该临时容器，主栈服务复核 **healthy**；**无 SQL**、**无项目代码 / 运行配置改动**、**未 commit / push / merge**。
+- **保留**：功能 worktree `F:\code\mall\.worktrees\retire-python-agent` 与分支 `codex/retire-python-agent` 均保留；**未清理** worktree / branch。
+- **说明**：本次状态校准为**纯文档更新**，未执行任何 Git 写操作；`main` 领先 `origin/main` **5 个提交且未推送**，`push` 待用户明确确认。
