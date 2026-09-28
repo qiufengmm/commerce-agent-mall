@@ -639,7 +639,7 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **Compose 暴露面**：`docker-compose.yml` 端口绑定 `127.0.0.1:${AGENT_PORT:-8086}:8086` 未变，无新增 host binding；environment 为 22 个 `MALL_AGENT_*` + `TZ`，无 `env_file`、无 DB/MQ/ES 凭据。
 - **关键未验证状态（如实记录）**：Task 12 Step 3（Docker 镜像构建）与 Step 4（Nginx runtime）仍受本机 Docker daemon 不可用阻塞、保持未勾选；`MallAgentRedisIntegrationTest`/`RedisSessionIntegrationTest` 的真实 Redis 用例在未配置 `MALL_AGENT_TEST_REDIS_URL` 时 skip；真实模型、真实会员 Token/优惠券、微信真机均未验证。上述未验证项不因本次静态扫描而改变。
 
-- [ ] **Step 2：记录完整验收并停止，不自行提交或推送**
+- [x] **Step 2：记录完整验收并停止，不自行提交或推送**
 
 报告分别列出：模块测试、全量 Maven 测试、13 项 Stub 评测、环境校验、Compose config、镜像构建、运行时代理/健康、Redis 实测、真实模型、真实会员优惠券、微信真机；未实测项标注“未验证”，不把配置校验写成运行时验证。
 
@@ -750,4 +750,13 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **功能提交**：`96bafb7`（实现 Java 商品导购智能体并完善部署安全）；`5182cea`（记录 Java 智能体迁移提交信息）。
 - **本地合并**：`main` 以非快进方式合并，提交 `18b5408cb7076f98b3da38c61fec0e9a82fa067b`（合并 Java 商品导购智能体迁移），无冲突。
 - **合并后复验**：在 `main` 新跑全 reactor `mvn -o -q -f mall-master/pom.xml test`，exit 0；本轮 Surefire 新鲜报告合计 1333 项、0 失败、0 错误、8 跳过（真实 Redis 门控用例）；`python -m pytest tests/unit/docker/test_compose_config.py -q` 为 163 passed；Compose 默认配置和 app/edge/observability 全 profile 配置均 exit 0；`git show --check` 无空白错误。
-- **远程边界**：`origin/main` 仍为 `56810c2`；本次交接记录提交后，本地 `main` 共比远程多 5 个提交（含本地既有提交、功能提交、合并及本次文档记录）。未执行 push；提交后 `main` 工作区干净。
+- **远程边界**：本次 2026-09-27 文档记录提交后，`origin/main` 跟踪引用为 `56810c2`，本地 `main` 比其超前 5 个提交；2026-09-28 主栈验收记录提交后将超前 6 个提交。未执行 push；提交后 `main` 工作区干净。
+
+## 2026-09-28 主栈游客 E2E 与 Task 13 记录收尾
+
+- **主栈配置**：运行中的 `mall-shopping-agent` 环境变量模式只读取到 `stub`；经主 Nginx `8088` 的 `/agent-api/health/live` 与 `/agent-api/health/ready` 均 HTTP 200。
+- **游客聊天**：使用本轮随机会话请求 `POST /agent-api/agent/chat`（“推荐一款手机”），HTTP/统一响应码均为 200，答案非空，返回 5 张商品卡，`requiresLogin=false`；会话 GET 返回 2 条消息；DELETE 返回 `deleted=true`，清理测试会话。未使用真实模型或会员凭据。
+- **副作用边界**：仅调用商品门户只读查询；无 SQL/MySQL 写、领券、购物车、订单、支付、库存或 ES 写。限流计数遵循既有 TTL。请求后单次 Compose 快照显示长期运行服务 healthy、`minio-init` 为预期 `Exited (0)`。
+- **计划勾选**：Task 13 Step 2 现标为完成，含义是完整验收报告与未验证清单已记录；不代表真实模型、会员优惠券、微信真机或正式域名已验收。主栈当前只完成 stub 游客流程。
+- **仍待人工/外部条件**：真实模型主栈调用、真实会员 Token/优惠券适用性、微信真机、正式 HTTPS/小程序合法域名，以及跨实例互斥评估；分网隔离并非严格出站隔离。
+- **Git**：功能和合并提交为 `96bafb7`、`5182cea`、`18b5408`；本次验收记录将在 `main` 另建中文文档提交。未 push。
