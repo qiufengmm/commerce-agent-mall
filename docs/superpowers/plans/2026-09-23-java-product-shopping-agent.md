@@ -799,3 +799,14 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 旧 Python 实现（`mall-shopping-agent/` 目录与其独立 `document/docker/Dockerfile.agent`）已由**用户手动从工作区移除**（当前为未提交的工作区删除项，尚未提交）；Java 17 `mall-master/mall-agent` 是**唯一运行实现**，Compose service key `mall-shopping-agent` 即该 Java service。
 本计划正文（含「Python 源码保留为参考」与上文历史 worktree 记录）为**历史记录**，不再代表当前状态；历史内容不重写、不删除。
 当前收尾与验收进度见 `docs/superpowers/plans/2026-09-28-retire-python-shopping-agent.md`。
+
+## 2026-09-28 状态补记（只读 Git 快照校准）
+
+本节仅校准上文历史记录的**当前状态误读风险**，**不修改、不删除**任何原有审查记录、历史数字或其他段落；以下为按 2026-09-28 只读 Git 快照得出的事实，后续动态状态以实时 `git worktree list` / 分支 ref 为准。
+
+- **旧 worktree 已不再注册**：当前 `git worktree list` 中**没有** `agent-live-acceptance`、`deepseek-base-url`、`java-agent-migration` 对应的已登记工作树。因此上文「待用户决定修复 / 归档」（`agent-live-acceptance`）与旧 worktree「待清理候选」等表述**不再构成当前待办**：**旧 worktree 的注册 / 清理已不再是当前待办事项**。
+- **对应本地分支 ref 仍保留，提交已在 `main` 历史中**：这三个本地分支 ref 仍存在，各自 tip 均为 `main@29e45c6` 的**祖先**。逐一对应（`git rev-list --left-right --count main...<branch>`）：`codex/agent-live-acceptance` = `17 0`；`codex/deepseek-base-url` = `19 0`；`codex/java-agent-migration` = `14 0`。因此**无需再清理对应 worktree**；此事实**不代表**应删除这些分支 ref。
+- **历史未提交改动的当前状态无法确认**：上文记录的 `agent-live-acceptance` **6 个未提交 Python 源/测试改动**仅是**旧时点观察**；现无已登记工作树 / ref 可核验其是否仍有副本，**不得推断**它们已恢复、已进入 `main` 或已彻底丢失；也**不得仅因该 worktree 不在列表中就宣称相关问题已关闭**。如用户仍需追查 / 恢复这些旧改动，应**另行明确决定**，本补记**不自动处理**。
+- **`deepseek-base-url` / `java-agent-migration`**：其旧 worktree 同样**未注册**；分支 ref 保留且提交均在 `main` 历史中（计数见上）。`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**保持保留不动**，未读取、未应用、未改写、未删除。
+- **远端快照（只读）**：本次快照 `main@29e45c6`、`origin/main@cd38a73`（`origin/main` 为 `main` 的**祖先**），`git rev-list --count origin/main..main` = `8`，即本地 `main` **超前 8 个提交、尚未推送**。此为**只读快照事实**；**推送仍须用户明确确认**，本任务**不推送**。
+- **快照边界**：以上事实均取自 2026-09-28 的**只读 Git 快照**（本次基线 `main@29e45c6`、工作区干净；仅只读查询 `git worktree list`、分支 ref 与 `git rev-list`、`git log`、`git stash list`）；未执行任何 Git 写操作，未清理任何 worktree / 分支 / 文件。后续状态一律以实时 `git worktree list` 与分支 ref 为准。
