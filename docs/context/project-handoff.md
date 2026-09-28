@@ -1,6 +1,6 @@
 # Mall 项目新对话交接摘要
 
-> 更新时间：2026-09-27
+> 更新时间：2026-09-28
 >
 > 本文件只用于新对话恢复项目上下文，不替代 `AGENTS.md`、正式计划、代码审查和实际验证。
 
@@ -8,10 +8,12 @@
 
 - 项目根目录：`F:\code\mall`
 - 当前分支：`main`
-- **2026-09-27 实测基线**：主仓库 `main` 与 `origin/main` **已一致**，均为 `56810c2805e099ac45f0422a881096dd532de760`（`Merge branch 'codex/deepseek-base-url'`）；`main` 工作区干净，**已由主 Agent 在既有授权下推送完成**（远端回读一致），**无待推送提交、无需再 push**。
-- 历史说明（已被上条取代，仅作记录）：本文件曾记录 `main` 领先远程 **3** 个提交、`origin/main`=`44d7f68…`、**尚未 push**；该状态已于 2026-09-27 由主 Agent 在既有授权下推送，现 `main` = `origin/main` = `56810c2…`。更早的 2026-09-25 记录（本地 `main`=`b75533b`、`origin/main`=`b8c46b1`、领先 5 个提交）一并保留为历史。
-- Java agent 功能工作树 `codex/java-agent-migration`：**HEAD `f7b822b`**，仍有**预期未提交文件**、**尚未合并**（**不得**写成主仓库已合并）。
-- 已合并的 Elasticsearch 可靠性工作树、`feature/es-reliability-hardening` 分支、旧 ES `stash@{0}` 和 `feature/es-legacy-hardening` 均已清理；当前剩余 `stash@{0}` 是原主工作区备份。商品导购实现工作树已清理，设计 worktree 在本轮收尾后同步清理。
+- **2026-09-28 实测基线（当前有效）**：主仓库 `main` 与 `origin/main` **一致**，均为 `ed5140aeee81d2668300964093c30ff0ad616d89`（`记录商品导购智能体推送状态`）；`main` 工作区干净，**无待推送提交**。本条**取代**此前 2026-09-27 的 `56810c2` 基线记录。
+- 历史基线（已被上条取代，仅作记录）：本文件曾记录 `main` = `origin/main` = `56810c2805e099ac45f0422a881096dd532de760`（`Merge branch 'codex/deepseek-base-url'`）；更早的 2026-09-25 记录（本地 `main`=`b75533b`、`origin/main`=`b8c46b1`、领先 5 个提交）一并保留为历史。
+- Java agent 功能工作树 `codex/java-agent-migration`：**已合并入 `main` 历史**（合并提交 `18b5408`，功能提交 `96bafb7`、`5182cea` 均在 `main` 历史中），该 worktree **工作区干净**。旧记录「HEAD `f7b822b`，仍有预期未提交文件、尚未合并」**已过期**，保留为历史。
+- **工作树清理候选（实际删除必须由用户手动执行，项目规则禁止批量目录删除）**：`codex/deepseek-base-url`（`73202de`）与 `codex/java-agent-migration`（`5182cea`）worktree 均干净、分支提交已在 `main` 历史中，可列为待清理。
+- **待用户决定（禁止清理或丢弃）**：`C:\Users\qiufengm\.codex\worktrees\agent-live-acceptance\mall`（分支 `codex/agent-live-acceptance`，HEAD `56810c2`）含 **6 个未提交的 Python 源/测试改动**，且**无对应这些改动的报告**；主 Agent 已只读审查，详见下文 2026-09-28 节。
+- 已合并的 Elasticsearch 可靠性工作树、`feature/es-reliability-hardening` 分支、旧 ES `stash@{0}` 和 `feature/es-legacy-hardening` 均已清理；当前剩余 `stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。商品导购实现工作树已清理。
 - `.env`、本地数据库快照、Docker 数据卷和运行时凭据均不纳入 Git。
 - 主工作区应保持干净；运行时 `.env`、数据库快照、Docker 数据卷和凭据不纳入 Git。
 
@@ -25,6 +27,7 @@
 5. Docker 本地全栈环境：MySQL、Redis、RabbitMQ、MongoDB、Elasticsearch、MinIO、三个 Java 服务和 Nginx 已编排；MinIO 使用固定 Quay 镜像，应用构建跳过旧 Fabric8 Docker 插件，Nginx 代理与健康检查已修复。
 6. 移动端 MinIO 地址适配：统一图片 URL 转换、富文本图片转换、H5/微信开发者工具/真机环境示例和局域网联调文档已合并；H5 经 Nginx 的 `/static/**` 映射、通知图片文件名兼容和真实 MinIO 对象访问均已验证；夸克手机最终复测正常，微信开发者工具图片验收也已完成。正式 HTTPS 合法域名仍留待后续环境配置。
 7. Python 商品导购智能体：独立 FastAPI 服务、OpenAI 兼容客户端、Redis 短期会话、只读商品/库存/优惠券工具、安全围栏、移动端聊天页、Docker Compose/Nginx 接入和 Stub 离线评测已合并；游客搜索/详情/库存的容器化只读链路已验证。真实模型、共享 Nginx `/agent-api/` 运行时代理和微信真机仍待环境具备后复测。
+   〔**2026-09-28 更新（当前有效）**：真实模型主栈 + 会员优惠券验收**已完成**（见本文「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」）；**微信真机 / 正式域名仍未完成**。本条之下 2026-09-25 / 2026-09-27 各段均为**历史时点**记录，其中「**尚未合并到 `main`**」「真实会员 Token / 会员券未测」等状态**已被取代**——Java agent 已由合并提交 `18b5408` 并入 `main`。〕
    **2026-09-25 更新（`java-agent-migration` 工作树，尚未合并到 `main`）**：商品导购智能体已用 Java 17 的 `mall-master/mall-agent` 重写。该工作树的 `docker-compose.yml` 已把 `mall-shopping-agent` 的构建切换为仓库根 context `.` + `document/docker/Dockerfile.app`（`MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086`，运行镜像 `eclipse-temurin:17-jre`），healthcheck 改为镜像内 `curl -fsS http://127.0.0.1:8086/health/live`，并注入 `AgentProperties` 全部 22 个 `MALL_AGENT_*` 白名单变量（外部凭据只有 `MALL_AGENT_OPENAI_API_KEY`，允许为空）〔**2026-09-27 更正**：安全加固新增 `MALL_AGENT_TRUSTED_PROXY_IP`，Compose 白名单**现为 23 个** `MALL_AGENT_*` 变量 + `TZ`；上列 22 个为该轮迁移初期清单，保留为历史〕。对外边界不变：service key `mall-shopping-agent`、`app` profile、容器端口 `8086`、宿主机绑定 `127.0.0.1`、`depends_on` 为 Redis 与健康的 `mall-portal`、Nginx `/agent-api/` → `mall-shopping-agent:8086`。Python `mall-shopping-agent/` 源码、测试与 `document/docker/Dockerfile.agent` 保留为参考，Compose 不再构建它们。Java 镜像构建与容器运行验收**未执行**（本机 Docker daemon 不可用），回滚方式见 `document/docker/local-startup.md` 第 4.7 节。
 
    **2026-09-27 更新（`java-agent-migration` 工作树，仍未合并到 `main`）**：本轮完成 Java agent 的 **E2E 验收**，Task 12 Step 4 勾选为 `[x]`。Docker daemon **29.5.3 已恢复**；本轮开始前与清理后原 Compose **13 个服务均 healthy**，原 Compose `mall-shopping-agent` 容器 ID 短前缀 **`2077801e5c74`**、镜像 SHA `sha256:aa9fb0606788935444270bad4ead7708659003cf16c79802fc40fb48decd745e`（标签指向本 Java worktree，**本轮未被替换**）；直连与主 Nginx `8088` 的 `/health/live`、`/health/ready` 均 **200**，主 Nginx `nginx -t` 成功。`mvn -o -f mall-master/pom.xml -pl mall-agent -am -DskipTests package` **exit 0**；尝试构建独立 tag `mall-local/mall-shopping-agent:e2e-20260927` 时 `Dockerfile.app` 的 Maven 步骤约 3 分钟无新输出，由主 Agent **Ctrl+C 中止**（**不是** Maven 编译失败，**未**查明网络原因）。随后以 `eclipse-temurin:17-jre` 临时容器只读挂载当前 JAR、独立临时 Redis（DB15、无持久化）与临时 Nginx（只读挂载项目 `document/docker/nginx/conf.d/default.conf`）完成 E2E：stub 模式下 `/agent-api/agent/chat` 对真实门户公开搜索 **HTTP 200**、**5 张门户商品卡**（字段均非空），session GET 2 条消息 / 5 张卡、DELETE `deleted=true`，游客个人券问题返回 `requiresLogin=true` 且无卡片；经 env 白名单另起临时 live one-off 容器加做一条「推荐一款手机」真实模型公开查询 **HTTP 200**、答案非空。**实测路径是临时隔离 app/Nginx，不是主 Nginx chat 调用**。全量测试 `mvn -o -q -f mall-master/pom.xml test`（`MALL_AGENT_TEST_REDIS_URL` 指向独立临时 Redis）Surefire **72 份报告合计 Tests=1243 / failures=0 / errors=0 / skipped=0**，**8 个真实 Redis 门控用例确实运行**；测试 Redis DB15 结束 `dbsize=0`、容器移除；`git diff --check` exit 0。临时容器/网络与测试端口 `18086`/`18087`/`18088`/`18089`、Redis `16380` 均已清理（现无监听），E2E **只写被删除的隔离 Redis**。**遗留与加固后状态**：上述公开聊天 E2E 与单条真实模型公开查询是**最新安全加固前**的历史运行证据（2026-09-27 上午，路径为**临时隔离 app/Nginx**，非主栈 chat）。**最初识别的 4 项部署边界 P2 均已在当前 Java 工作树代码中处理（代码/静态与单测层；最新运行时仍待验收）**：（1）`Dockerfile.app` runtime 以固定 UID/GID `10001:10001`（`USER mallapp`）**非 root** 运行；（2）Compose 中 Agent 只接入 `agent-proxy-net` 与 `agent-backend-net`，**不再接入 `mall-net`**，看不到数据库等无关服务；（3）`ClientIpResolver` 仅在请求对端 `remoteAddr` 与 `MALL_AGENT_TRUSTED_PROXY_IP`（**默认空 = 不信任任何代理**）按字节相等时才采信 `X-Real-IP`，且不读 `X-Forwarded-For`；（4）CORS 默认空并拒绝通配 `*`（fail-closed，`docker-compose.yml`/`.env.example` 去掉了 `:-*` 兜底）。**这些结论均为代码/静态层，最新镜像/网络/Nginx 源 IP/Redis 门控/主栈 chat 的实际运行行为尚未复验。** 当前最终静态/测试证据见 `.codebuddy/reports/java-agent-hardening-review-report.md`：全 reactor 9 模块 **984 tests / 0 failure / 0 errors / 8 skipped**（8 项 Redis 集成测试在无测试 Redis 时跳过；〔**2026-09-27 更正**：此「984」实为**仅 `mall-agent` 单模块**的用例数被误写为全 reactor 总数；接独立临时 Redis 后最新全 reactor 总数为 **1320**，见下方「独立运行验收轮」〕）、Python Compose 静态测试 **152 passed**〔**2026-09-27 更新**：新增 3 条 Nginx 日志脱敏用例后为 **155 passed**〕、默认与全 profile `compose config` **exit 0**、`git diff --check` **exit 0**。**用户个人券真实会员 Token 未测**、**微信真机未测**；**Task 12 Step 4 保持 `[x]`（依据为临时隔离 app/Nginx 路径）**；**Task 13 仍未完成**（不因静态检查通过而标完成）；**Java 分支仍未合并**。
@@ -59,6 +62,8 @@
 
 ## Docker 验证基线
 
+> **历史日志说明**：本节按时间点记录历次运行 / 验证基线，**每一条只代表其执行时点**，不同轮的计数、勾选与基线口径**不得跨轮相加或混用**。本节末段 2026-09-27 各条的待办中「`main` = `origin/main` = `56810c2`」「Task 13 Step 2 保持 `[ ]`」「真实会员券 / 微信真机未验收」等状态，**均已被下方「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」取代**，以该节为准。
+
 - 10 个常驻服务健康，`minio-init` 成功退出 `Exited (0)`。
 - Nginx、三个 API 入口、MinIO 健康检查和 ES 检查均已返回成功；ES 集群为 green。
 - 三个 Java 应用镜像已成功构建。
@@ -77,17 +82,45 @@
 
 **2026-09-27 Java 导购迁移本地合并完成**：补齐详情 SKU `spData` 透传与会话 GET/DELETE 的可信客户端 IP 限流；Nginx `/agent-api/` 请求体上限 32 KB、读超时 60 秒、location 错误日志写入 `/dev/null`（此路由的 Nginx error details 会丢弃，access log 保留脱敏诊断字段）。中文功能提交为 `96bafb7`（实现 Java 商品导购智能体并完善部署安全）和 `5182cea`（记录 Java 智能体迁移提交信息）；本地非快进合并提交为 `18b5408cb7076f98b3da38c61fec0e9a82fa067b`。合并后在 `main` 重验：Maven 全 reactor **1333 项，0 失败 / 0 错误 / 8 跳过**（真实 Redis 门控用例）；Python Compose/Nginx **163 passed**；Compose 默认与全 profile 配置均通过；合并 diff 检查通过。未 push，`origin/main` 仍为 `56810c2`；真实会员券、微信真机、正式域名仍暂缓。
 
+## 2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）
+
+> 本节为**当前有效的实测结论**（追加，不删改上文历史）。上文 2026-09-27 及更早各轮中「真实模型 / 真实会员券未验收」「主栈 `8088` chat 未验收」等状态，凡与本节冲突者，**以本节为准**。
+
+- **基线**：主仓库 `main` = `origin/main` = `ed5140a`，`main` 工作区干净。
+- **主 Compose 运行模式**：对主 Compose `mall-shopping-agent` 做只读 `docker inspect` 并**仅筛选** `MALL_AGENT_MODEL_MODE`，确认运行模式为 **`openai`（真实模型）**。**未读取、未记录任何 API Key / Token / 会话 UUID。**
+- **主 Nginx H5 页面**：`http://localhost:8088`。
+- **登录态真实模型优惠券解释（H5）**：实际展示的优惠券解释与「已领取券」页**匹配**——**优惠金额、无门槛、指定商品范围、有效期**均正确。**未记录会员 ID 或任何凭据。**
+- **真实模型商品详情查询（H5）**：查询 iPhone 14 返回**售价 5999 元**，详情 SKU **合计可售库存 2394**；回答**主动披露**「列表页库存与详情页库存不一致」，并**以详情页为准**。
+- **真实模型预算筛选（H5）**：按「手机售价不超过 4000 元」筛选，本次搜索返回 **5 件**，其中 **3 件在预算内**：红米 5A（649 元 / 库存 414）、小米 8（2699 元 / 库存 410）、华为 P20（3788 元 / 库存 1985）；两台超预算 iPhone **未进入推荐**；随后多轮追问**正确比较出华为 P20 库存最高**。（以上均为**查询时点数据**。）
+- **游客真实模型聊天（主 Nginx，无 Authorization）**：`POST /agent-api/agent/chat` 返回 **HTTP 200**、统一响应 `code=200`、`requiresLogin=false`、**答案非空**、**1 张商品卡**；本轮所用临时会话 `DELETE` 返回 `deleted=true`。
+- **诚实备注（不得编造）**：首次探测脚本的 **PowerShell 多行输出解析有误**，**不能**把其中 `-1` 记为接口失败；**首次会话清理的 DELETE 回执未成功解析**，其清理结果**不确定**，仅能说明服务会话存在 TTL 兜底；**不臆断**该会话已立即删除。
+- **副作用边界**：本轮**未执行任何 SQL、无代码改动**；H5 登录态对话产生了新增查询内容，留存在**短期会话**中。
+- **验收结论**：**真实模型主栈与会员优惠券验收已完成。**
+- **仍未完成**：**微信开发者工具 / 真机的商品导购端到端验收**（**需用户扫码配合**）；**正式 HTTPS / 小程序合法域名**按用户决定**暂缓**；`GET` / `DELETE` **跨实例互斥**仍为**可选技术遗留**（单实例已按当前目标验证）。
+
+## 2026-09-28 工作树只读审查（`agent-live-acceptance`，待用户决定）
+
+> 本节为**只读审查**记录（追加，不改动该工作树）。**禁止清理或丢弃该工作树**，结论为**待用户决定修复 / 归档**。
+
+- **对象**：`C:\Users\qiufengm\.codex\worktrees\agent-live-acceptance\mall`，分支 `codex/agent-live-acceptance`，HEAD `56810c2`；含 **6 个未提交的 Python 源/测试改动**，且**无对应这些改动的报告**。
+- **定向 pytest 结果**：因**缺少 `redis` 包**，`api/test_chat.py` 在**收集（collection）阶段即失败**，**该模块测试未执行**。
+- **不涉及 API 的两文件测试**（`safety` + `orchestrator`）：**共 61 项，59 通过、2 失败**：
+  1. 样例「我这张券能用在这款商品上吗」**未命中**个人券意图；
+  2. 样例「帮我领优惠券」被**错误命中**个人券意图。
+- **处置**：该工作树及改动**保持原样**，标记为**待用户决定修复 / 归档**；**不得**清理、丢弃或提交。
+- **其他工作树**：`codex/deepseek-base-url`、`codex/java-agent-migration` 均干净，分支提交已在 `main` 历史中，列为**待清理候选**（实际删除须由用户手动执行）。`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。
+
 ## 当前剩余任务
 
-1. Java 导购智能体代码迁移的提交、审查、本地合并、主栈 stub 游客验收及自动化复验**已完成并推送**：功能提交 `96bafb7`、`5182cea`，合并提交 `18b5408`，验收记录提交 `fecc43a`；`git push origin main` 成功，远端回执为 `56810c2..fecc43a main -> main`。本地 `main` 与 `origin/main` 跟踪引用相同、工作区干净。推送后的独立 `ls-remote` 复核遭遇 TLS 握手失败；未 force push。
-2. 最新安全加固后的**独立运行验收**：已在**临时隔离环境**完成（详见「已完成模块 #7」的独立运行验收轮）—— 非 root `UID/GID 10001` 在最新镜像运行层生效、分网拓扑、经 Nginx 的 `X-Real-IP` 采信边界（伪造源 IP 且 IP 配额 1 时第二次 `429`）、未受信任 Origin `OPTIONS` `403`、`/agent-api/health/ready` `200`、stub 游客 chat `200` 与 5 张门户卡、session GET / DELETE。**仍未验收**：**主栈**（非临时隔离环境）`/agent-api/agent/chat`、可信代理双客户端正路径、最新镜像下真实模型 / 真实会员 Token / 会员券 / 微信真机，以及新版非 root 的 `mall-admin` / `mall-search` / `mall-portal` 镜像。**边界口径**：本轮只是**分网隔离**，**不是严格出站隔离**（`host.docker.internal` 仍可达主栈宿主发布端口 `13306` 及 Mongo `27018`、ES `9200`；共享无认证 Redis 仍同实例）——用户已决定按分网隔离继续并记录风险，**不得**写成「看不到数据库」或「网络层完全隔离」。**补充更正（2026-09-27，Docker Desktop 重启后最终镜像复验）**：最终镜像身份 / `HOME` 与 `GET /health/live` / `GET /health/ready` **均已验证通过**，但**最终镜像聊天请求未获得响应**，**最终镜像聊天 E2E 未通过**，**旧版镜像隔离聊天 E2E 不能替代本轮最终镜像聊天验收**；本轮及前后 Docker API 卡住时 **WSL 内存 / swap 资源耗尽**已记录为**高度相关证据**（不绝对断言唯一根因）；主栈已精确清理本轮临时资源后**恢复中，健康状态由主 Agent 另行复核**。
+> 说明：Java 导购智能体代码迁移、提交、审查、本地合并、`git push`、主栈 stub 游客验收，以及**真实模型主栈 + 会员优惠券适用性验收**均已**完成**（历史与结论见上文「已完成模块 #7」「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」），不再列为剩余任务。以下仅列**当前仍未完成 / 待用户决定**的事项。
 
-   **最新补充更正（2026-09-27，当前有效结论）**：**最终镜像的隔离 Nginx 路径 E2E 已通过**——`/agent-api/health/live`、`/agent-api/health/ready` **200**；`chat` **200** 且 **5 张真实门户商品卡**；会话 `GET` **2 条消息** / `DELETE` **成功**；游客券 `requiresLogin=true` 且 **0 卡**；Nginx 日志**无 UUID / query**但保留 **method / status**；**首次 400 仅因测试请求漏传必填 `sessionId`**。**先前「最终镜像聊天未完成」仅属历史第一次失败轮，不代表现状**。**仍未验收**：**主栈 `8088` chat**、**真实会员券 / 微信真机**、**正式域名**；**Task 13 Step 2 保持 `[ ]`**。主栈仅有一次 **13/13 healthy 快照**（第三次重启 Docker Desktop 后），**其后 Docker API 仍间歇卡住，不作持续健康断言**。
-3. 商品导购智能体剩余真实环境验收：**真实会员 Token / 会员券适用性**、**微信开发者工具 / 真机**复测（真实模型公开查询此前仅在临时 live 容器加做一条）。
-4. 配置正式 HTTPS、合法域名和微信小程序安全域名，替换当前局域网 HTTP 联调配置；当前按用户决定暂缓。
-5. 可选/后续：评估 Elasticsearch 多实例 `importAll` 压力测试与 outbox/MQ 补偿机制（该项**未执行**，不得视为已完成）。
+1. **微信开发者工具 / 真机**商品导购端到端验收：**未完成**，**需用户用开发者工具 / 真机扫码配合**。
+2. **正式 HTTPS / 小程序合法域名**：按用户决定**暂缓**，待后续环境配置。
+3. **可选技术遗留 / 风险记录**：`GET` / `DELETE` 会话**跨实例互斥**仍为可选技术遗留（单实例已按当前目标验证）；网络为**分网隔离，非严格出站隔离**（`host.docker.internal` 仍可达主栈宿主发布端口；共享无认证 Redis 同实例），用户已决定先记风险并继续。ES 多实例 `importAll` 压力测试与 outbox/MQ 补偿机制**未执行**，不得视为已完成。
+4. **`codex/agent-live-acceptance` 脏工作树（待用户决定，禁止清理 / 丢弃 / stash / 提交 / 擅自修复）**：`C:\Users\qiufengm\.codex\worktrees\agent-live-acceptance\mall`，分支 `codex/agent-live-acceptance`，HEAD `56810c2`，含 **6 个未提交的 Python 源 / 测试改动**，且**无对应报告**（详见「2026-09-28 工作树只读审查」）。
+5. **两个干净 worktree 手动清理候选（实际删除须由用户手动执行，项目规则禁止批量目录删除）**：`codex/deepseek-base-url`（`73202de`）、`codex/java-agent-migration`（`5182cea`），均干净、分支提交已在 `main` 历史中。
 
-**2026-09-28 主栈补测更正（覆盖上方旧记录中“主栈 `8088` chat 未验收”的状态）**：Compose 主栈 `mall-shopping-agent` 运行模式为 `stub`；经 `127.0.0.1:8088/agent-api/`，live/ready 均 200，游客“推荐一款手机”聊天返回 200 和 5 张商品卡；会话 GET 为 2 条消息，DELETE 返回 `deleted=true`。随机测试会话已清理。此测试使用 stub，不代表真实模型、会员 Token/优惠券、微信真机或正式域名验收；无 SQL/MySQL 写入，商品链路为门户只读调用。请求后单次状态快照显示长期运行服务 healthy，`minio-init` 为预期退出码 0。Task 13 Step 2 的报告记录现已补全并勾选；人工及真实环境待办仍保留。
+**2026-09-28 主栈补测更正（覆盖上方旧记录中“主栈 `8088` chat 未验收”的状态；历史记录，保留）**：〔**2026-09-28 后续更新**：主 Compose 现经只读 `docker inspect` 确认为 **`openai`（真实模型）**运行模式，且**主栈真实模型 + 会员券验收已完成**，见上文「2026-09-28 主栈真实模型与会员优惠券验收（当前有效结论）」；本段 `stub` 结论为**该时点**记录，仅作历史。〕Compose 主栈 `mall-shopping-agent` 运行模式为 `stub`；经 `127.0.0.1:8088/agent-api/`，live/ready 均 200，游客“推荐一款手机”聊天返回 200 和 5 张商品卡；会话 GET 为 2 条消息，DELETE 返回 `deleted=true`。随机测试会话已清理。此测试使用 stub，不代表真实模型、会员 Token/优惠券、微信真机或正式域名验收；无 SQL/MySQL 写入，商品链路为门户只读调用。请求后单次状态快照显示长期运行服务 healthy，`minio-init` 为预期退出码 0。Task 13 Step 2 的报告记录现已补全并勾选；人工及真实环境待办仍保留。
 
 ## 新对话必须遵守
 
