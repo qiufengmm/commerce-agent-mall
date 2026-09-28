@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. 遵循 Mall 手工 worktree 流程；不通过 MCP 自动分派编码子任务。步骤使用 `- [ ]` 复选框跟踪状态。
 >
-> **当前进度（2026-09-28）**：Task 0–6 已完成；Task 7.1–7.6 已实测通过；Task 8.1 实施报告已生成；**Task 8.2 将在助手本次最终中文简短回执后完成**。文末「实施后必须由主 Agent 审查的事项」（独立只读审查、中文提交、本地合并、`push`）**仍为待办，未勾选**；`git push` 需用户明确确认。删除由**用户手动执行**；助手的编辑限于文档与 Compose 注释。
+> **当前进度（2026-09-28）**：Task 0–8 **全部完成**（Task 8.2 随最终回执完成）。文末「实施后必须由主 Agent 审查的事项」中：**独立只读复核已通过、中文提交已创建（`df86cf5`）、本地合并已完成（`f908c32`）**；**仅 `push` 仍为待办，需用户明确确认**。删除由**用户手动执行**；助手的编辑限于文档与 Compose 注释。
 >
-> **独立复核状态**：首轮独立只读复核（`gpt-6-luna`，推理强度 `max`）返回 **1 项 P1 + 2 项 P2**（文档口径），**均已修复**；**第二轮独立只读复核已通过**（首轮问题均已解决，暂未发现新阻断；第二轮 P3 非阻断建议——不应把保留分支 ref 编号放在「当前剩余任务」列表——**已通过移除重复列表项解决**）。**提交 / 本地合并 / `push` 后置流程仍未完成；`git push` 仍需用户明确确认。** 详见报告第 11 / 12 节与设计稿第 11 节。
+> **独立复核状态**：首轮独立只读复核（`gpt-6-luna`，推理强度 `max`）返回 **1 项 P1 + 2 项 P2**（文档口径），**均已修复**；**第二轮独立只读复核已通过**（首轮问题均已解决，暂未发现新阻断；第二轮 P3 非阻断建议——不应把保留分支 ref 编号放在「当前剩余任务」列表——**已通过移除重复列表项解决**）。**本地集成已完成**（功能提交 `df86cf5e41fa5778872ed5841c1e7d5fd32fba62`、合并提交 `f908c32055c537c6e8c467f83b30b690b5aad863`）；**仅 `git push` 仍未执行，需用户明确确认**。详见报告第 11 / 12 节与设计稿第 11 节。
 
 **目标：** 从仓库中退役已不再运行的旧 Python 商品导购智能体实现（`mall-shopping-agent/` 目录与 `document/docker/Dockerfile.agent`），并同步更新仍指向旧 Python 资产的活动文档；保持 Java 运行时服务、对外契约、配置与前端完全不变。
 
@@ -326,7 +326,7 @@
 
 > 以下均由主 Agent 完成，工作树不得自行执行 Git 写操作。**仅在以下全部通过后**才创建中文提交。
 >
-> **第二轮独立只读复核已通过**（首轮 1 P1 + 2 P2 均已解决；非阻断 P3 文案建议已通过移除重复待办项解决）。**以下独立复核/提交/本地合并/`push` 后置流程仍为待办，须由主 Agent 执行；`push` 需用户明确确认。**
+> **第二轮独立只读复核已通过**（首轮 1 P1 + 2 P2 均已解决；非阻断 P3 文案建议已通过移除重复待办项解决）。**上述第 1–8 项已由主 Agent 完成（含提交 `df86cf5` 与本地合并 `f908c32`）；仅第 9 项 `push` 仍为待办，需用户明确确认。**
 
 1. **删除范围核验**：确认工作区删除项恰为 `mall-shopping-agent/`（74）与 `document/docker/Dockerfile.agent`（1）——这些删除由**用户手动执行**产生，助手未代删。主 Agent 审查时用 `git add -A` 暂存后读取 `git diff --cached --name-status` 复核，确认无其它意外改动。
 2. **Compose contract 审查**：确认 `docker-compose.yml` 变更**仅注释**；`mall-shopping-agent` service 仍为 Java 运行构建；profiles/端口/网络/依赖/healthcheck 未变。
@@ -337,3 +337,20 @@
 7. **提交**：审查通过后创建中文提交（一个清晰逻辑单元）。提交前确认不包含 `.env`、密钥、`target/`、`node_modules/`、`dist/`。
 8. **本地合并复验**：确认功能 worktree 与 `main` 工作区均无未提交改动后再本地合并；合并后重新运行 Task 7 关键验收并检查合并后 diff 与工作区状态。
 9. **推送**：**只有用户明确确认**后才执行 `git push`；推送前确认具体远程仓库与分支。
+
+---
+
+## 2026-09-28 集成记录（本地合并）
+
+- **用户选择**：集成选项 1 —— 本地合并到 `main`。
+- **功能提交**：`df86cf5e41fa5778872ed5841c1e7d5fd32fba62` ——「退役旧 Python 商品导购实现」。
+- **本地合并提交**：`f908c32055c537c6e8c467f83b30b690b5aad863` ——「合并旧 Python 商品导购退役」。
+- **合并后复验**（在 `F:\code\mall` 主工作树**新鲜运行**）：
+  - `mvn -f mall-master/pom.xml test` → **exit 0**、BUILD SUCCESS、**9 模块**、**997 tests**、**0 failures / 0 errors / 8 skipped**（8 项为**未配置专用测试 Redis** 的 Redis integration，**非失败、亦不称 passed**）；
+  - `docker compose --env-file .env.example config --quiet` → **exit 0**；全 profiles（`app` + `edge` + `observability`）同命令 → **exit 0**；
+  - `git diff --check` → **exit 0**；
+  - 合并前后主工作树 `git status` **clean**（无 working-tree changes）。
+- **origin 未改**：`origin/main` 仍为起始基线 `cd38a7367bb0c071f378e01e6baf05c81edb3cd5`；本地 `main` = `f908c32`、**领先 3 个提交**、**尚未推送**；`git push` 需用户明确确认。
+- **保留**：功能 worktree `F:\code\mall\.worktrees\retire-python-agent` 与分支 `codex/retire-python-agent` 均**保留**；**未清理** worktree / branch。
+- **本地残留（仅记录，未处理）**：`F:\code\mall\mall-shopping-agent/` 目录仍物理存在，但**无 tracked 文件**，仅剩被忽略的 `.pytest_cache/`、`.ruff_cache/`、`.venv/` 等本地缓存/虚拟环境目录；不影响 `git status` 干净状态。
+- **说明**：提交 `df86cf5` 与合并 `f908c32` 由**主 Agent** 执行；本工作树助手未执行任何 Git 写操作。本文件此后的局部状态更新**不另建提交**。
