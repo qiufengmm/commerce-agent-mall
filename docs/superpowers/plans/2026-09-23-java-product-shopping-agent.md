@@ -793,3 +793,9 @@ README、agent 文档、local-startup 与 handoff 说明 Java 是运行实现、
 - **处置**：**禁止清理或丢弃该工作树**，标记为**待用户决定修复 / 归档**。
 - **其他工作树**：`codex/deepseek-base-url`、`codex/java-agent-migration` 均干净、分支提交已在 `main` 历史中，列为**待清理候选**（实际删除须由用户手动执行，项目规则禁止批量目录删除）；`stash@{0}`（`On main: 集成 Docker 本地运行修复前的主工作区备份`）**应保留**。
 - **本轮边界**：本节为**纯文档更新**，未改 Java / Python / 前端 / Compose / Nginx / 配置 / 数据库，未执行 Git 集成操作，未清理任何 worktree。
+
+## 2026-09-28 退役附记
+
+旧 Python 实现（`mall-shopping-agent/` 目录与其独立 `document/docker/Dockerfile.agent`）已由**用户手动从工作区移除**（当前为未提交的工作区删除项，尚未提交）；Java 17 `mall-master/mall-agent` 是**唯一运行实现**，Compose service key `mall-shopping-agent` 即该 Java service。
+本计划正文（含「Python 源码保留为参考」与上文历史 worktree 记录）为**历史记录**，不再代表当前状态；历史内容不重写、不删除。
+当前收尾与验收进度见 `docs/superpowers/plans/2026-09-28-retire-python-shopping-agent.md`。

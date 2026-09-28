@@ -171,3 +171,9 @@ Java 版达到以下条件才视为迁移完成：
 - [x] 将未提交分支中的个人券意图行为作为规则要求迁移，但不合并或改写该 worktree。
 - [x] Python 源码保留为参考，不再进入最终 Compose 运行链路。
 - [x] 不接 MySQL/MongoDB/RabbitMQ/Elasticsearch 客户端，不新增表，不增加任何商城写操作。
+
+## 2026-09-28 退役附记
+
+旧 Python 实现（`mall-shopping-agent/` 目录与其独立 `document/docker/Dockerfile.agent`）已由**用户手动从工作区移除**（当前为未提交的工作区删除项，尚未提交）；Java 17 `mall-master/mall-agent` 是**唯一运行实现**，Compose service key `mall-shopping-agent` 即该 Java service。
+本文件正文（含「Python 源码保留为参考」等表述）为**历史设计记录**，不再代表当前运行事实；历史内容不重写。
+当前收尾与验收进度见 `docs/superpowers/plans/2026-09-28-retire-python-shopping-agent.md`。

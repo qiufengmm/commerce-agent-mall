@@ -1,7 +1,7 @@
 # 退役旧 Python 商品导购智能体设计稿
 
 - 日期：2026-09-28
-- 状态：设计稿（仅设计，不含实施；待用户审核通过后再编写实施计划）
+- 状态：**已批准并已实施**（用户已批准范围并**手动删除**两个目标；本设计稿保留为设计记录）。**后续主 Agent 独立复核 / 提交 / 合并 / push 尚未完成。**（详见第 11 节「实施与复核更正」）
 - 工作树：`F:\code\mall\.worktrees\retire-python-agent`（分支 `codex/retire-python-agent`）
 - 起始基线（本任务开始时实测）：`main` = `origin/main` = `cd38a73`（`合并商品导购验收计划与交接摘要`），与本工作树 HEAD 一致。**该值是退役任务开始时的基线，不是退役合并后的 HEAD。**
 - 相关规则：`F:\code\mall\AGENTS.md` 第 2、5、7、8 节
@@ -64,7 +64,7 @@
 
 | 方案 | 内容 | 结论 |
 | --- | --- | --- |
-| A. 删除 + 文档同步（推荐） | 删除 `mall-shopping-agent/` 与 `Dockerfile.agent`，更新活动文档与交接摘要 | 采纳。运行实现早已是 Java，Python 目录纯属死代码；留着会让后来者误以为可回滚、并误导构建路径。 |
+| A. 删除 + 文档同步（推荐） | 删除 `mall-shopping-agent/` 与 `Dockerfile.agent`，更新活动文档与交接摘要 | **已采纳并已实施**（删除由**用户手动执行**，助手不代删）。运行实现早已是 Java，Python 目录纯属死代码；留着会让后来者误以为可回滚、并误导构建路径。 |
 | B. 只删 `Dockerfile.agent`，保留 Python 源码 | 仅移除独立镜像定义 | 否决。Python 源码与测试仍会被误认为“可运行实现”，且回滚文档仍指向已不可用的路径；清理不彻底。 |
 | C. 全部保留，只改文档 | 仅把文档改成“已退役” | 否决。仓库继续背负 74 个失效文件与死构建路径；与用户已确认范围不符。 |
 | D. 删除并改写全部历史文档 | 连历史计划/设计一起改写 | 否决。历史计划与 Java parity 对照是审查与追溯材料，改写会丢失上下文；改为“保留 + 追加短附记”。 |
@@ -73,14 +73,14 @@
 
 ## 4. 精确文件边界
 
-### 4.1 删除（Delete）
+### 4.1 删除（Delete，**由用户手动执行**）
 
 | 路径 | 说明 |
 | --- | --- |
 | `mall-shopping-agent/`（整个目录，74 个 tracked 文件） | 旧 Python 工程：`README.md`、`pyproject.toml`、`.dockerignore`、`evals/**`、`src/mall_shopping_agent/**`、`tests/**` |
 | `document/docker/Dockerfile.agent` | 旧 Python 独立镜像定义，当前 Compose 无引用 |
 
-删除前须再次确认：无 untracked / ignored 文件残留（当前已确认为空）；无活动构建/运行路径引用（见第 6 节）。
+**删除由用户手动执行，助手不代删。** 执行前须确认：无 untracked / ignored 文件残留（已确认为空）；无活动构建/运行路径引用（见第 6 节）。
 
 ### 4.2 修改（Modify，仅限以下位置）
 
@@ -89,7 +89,7 @@
 | `docker-compose.yml` | **仅注释**：`415` 行“Python 源码与历史测试仅作参考”与 `440-441` 行“需要回到 Python 旧实现时…回滚为 `context: ./mall-shopping-agent` + `Dockerfile.agent`”更新为不再指向已删除路径 | 任何 YAML 键值、service 字段 |
 | `document/docker/local-startup.md` | 4.7 节：`714-715` 行“仅作参考保留”改为“已退役删除”；**完整删除** `928-992` 行 Python 回滚块，替换为短的 Git 层 `git revert` 恢复说明（见 4.5） | 4.7 节其它 Java 运行说明、端口/网络/探针等描述 |
 | `document/agent/product-shopping-agent.md` | 文首状态备注（`3-13` 行等）改为“Python 实现已退役并从仓库删除，本文仅存历史设计”；正文历史设计段落保留 | 对外边界、API 契约等仍有效的描述 |
-| `docs/context/project-handoff.md` | 更正过时基线记录 `ed5140a`，表述为“本任务起始基线 `cd38a73`（`main` = `origin/main`）；后续状态以 git 实测为准”，**不预设未来合并 SHA**；Python 商品导购智能体条目状态更新为“Java 为唯一实现，Python 已退役”；Python worktree 待办按本轮 `git worktree list` 实测标记为过时 | 其它模块基线、工作流说明 |
+| `docs/context/project-handoff.md` | 更正过时基线记录 `ed5140a`，表述为“本任务起始基线 `cd38a73`（`main` = `origin/main`）；后续状态以 git 实测为准”，**不预设未来合并 SHA**；Python 商品导购智能体条目状态更新为“Java 为唯一实现，Python 已退役”；旧 worktree 条目按 `git worktree list` 实测改为**历史说明**（区分 worktree 与**保留不变**的分支 ref，不清理 refs） | 其它模块基线、工作流说明 |
 
 ### 4.3 仅追加退役附记（Append only）
 
@@ -137,7 +137,7 @@
 | --- | --- | --- |
 | 误删 Java 的 service 或误改 service 定义 | 智能体运行链路中断 | 第 2.3 节澄清 + 第 4.2 节限定“Compose 只改注释”；审查时逐行核对 service 块 diff |
 | 活动构建路径仍引用被删文件 | `docker compose build` 失败 | 已扫描：仅注释/文档引用；验收阶段再全量扫描 `Dockerfile.agent` / `mall-shopping-agent/` / `mall_shopping_agent` 的活动（非历史）引用 |
-| 删除目录触及项目“禁止批量删除”规则 | 违规操作 | 见第 8 节；范围已由本设计稿确认为两个精确路径组，采用 `git rm -r -- <path>`（仅移除已跟踪文件），禁止 `rm -rf` / `rd /s` / `Remove-Item -Recurse` |
+| 删除目录触及项目“禁止批量删除”规则 | 违规操作 | 见第 8 节；范围已确认为两个精确路径组，**由用户手动删除**；助手**不得**使用 `git rm -r`、`rm -rf`、`rd /s`、`Remove-Item -Recurse` 等递归/批量删除命令 |
 | 回滚能力丧失 | 无法本地退回 Python 运行时 | 设计取舍：Git 历史即唯一回滚来源（第 4.5 节）；本设计稿与退役附记提供追溯 |
 | 误删 `.gitignore` Python 忽略规则或 Java parity 对照 | 未来误提交 .pyc / 丢失审查上下文 | 第 4.4 节明确列为“保留” |
 | 交接摘要基线写错 | 后续对话基于错误基线 | 第 4.2 节将过时 `ed5140a` 更正为“本任务起始基线 `cd38a73`”，并注明后续以 git 实测为准 |
@@ -162,11 +162,11 @@
 
 ## 8. 实施顺序与合规约束
 
-1. 本设计稿经用户审核通过后（删除范围、回滚方式、删除方法均以此稿为准，不再另行征询），先在**干净工作树**上执行删除，再改活动文档，最后追加历史附记。
-2. 删除必须遵守 `AGENTS.md` 第 5 节，范围已由本设计稿确认为两个精确路径组：
+1. **已执行**：本设计稿经用户批准后，**由用户手动删除**两个目标（`mall-shopping-agent/` 与 `document/docker/Dockerfile.agent`），随后更新活动文档并追加历史附记。
+2. 删除由 `AGENTS.md` 第 5 节约束，范围已确认为两个精确路径组：
    - 仅删除 `mall-shopping-agent/`（整个目录）与 `document/docker/Dockerfile.agent`，只移除**已跟踪**文件；
-   - 不使用 `del /s`、`rd /s`、`rmdir /s`、`Remove-Item -Recurse`、`rm -rf`；
-   - 采用 `git rm -r -- mall-shopping-agent` 与 `git rm -- document/docker/Dockerfile.agent`（Git 层、可 `revert`、不触碰未跟踪文件）；执行前打印将被删除的精确路径清单作为操作留痕，并再次确认目录内无 untracked / ignored 文件。
+   - **由用户手动删除**；助手与任何自动化流程**均不得**使用 `git rm -r`、脚本循环、`del /s`、`rd /s`、`rmdir /s`、`Remove-Item -Recurse`、`rm -rf` 等**递归/批量删除**命令；
+   - **历史记录（已被用户手动删除方案取代，不得执行）**：本设计稿早期版本曾把 `git rm -r -- mall-shopping-agent` 与 `git rm -- document/docker/Dockerfile.agent` 列为执行方式；该写法**已被取代**，仅作追溯说明，**禁止**作为可执行步骤。
 3. 不做与本设计无关的顺手清理、重命名或“改善”。
 4. 实施阶段不在工作树内 `commit` / `push` / `merge`；由主 Agent 按标准流程处理。
 
@@ -183,15 +183,35 @@
 
 ---
 
-## 10. 已决事项与唯一待办
+## 10. 已决事项与当前进度
 
-### 10.1 已决（用户已确认，不再重新征询）
+### 10.1 已决（用户已批准，不再重新征询）
 
 1. **删除范围**：采纳方案 A——删除整个 `mall-shopping-agent/` 目录（74 个 tracked 文件）与 `document/docker/Dockerfile.agent`，仅限这两个精确路径组，且只移除**已跟踪** Python 文件。
 2. **回滚文档处理**：完整删除 `document/docker/local-startup.md` 的原 Python 回滚块（`928-992`），用短的 Git 层 `git revert` 恢复说明取代；**不保留**任何可复制的历史 Python 命令（见第 4.5 节）。
-3. **手动待办 / worktree 状态**：以本轮 `git worktree list` 实测更新 `docs/context/project-handoff.md`；实测仅 `F:\code\mall`（main）与本工作树存在。
-4. **删除执行方式**：采用第 8 节的两路径 `git rm` 做法；范围已决，实施时仅打印路径清单留痕。
+3. **手动待办 / worktree 状态**：以 `git worktree list` 实测为准（实测仅 `F:\code\mall`（main）与本工作树）；**worktree 与分支 ref 分开看待**，不清理任何 refs。
+4. **删除执行方式**：**由用户手动删除**；助手不代删、不使用任何递归/批量删除命令（见第 8 节）。
 
-### 10.2 唯一待办（门禁）
+### 10.2 当前进度与后续
 
-- 请用户**审阅并批准本设计稿**。批准后由主 Agent 编写实施计划并执行；**本设计稿未获批准前不进入实施**。删除范围、回滚方式、删除方法均已在本稿确定，不再单独征询。
+- **已完成**：用户批准范围并**手动删除**两个目标（74 个 tracked 文件 + `document/docker/Dockerfile.agent`）；活动文档与历史附记已同步；工作树内自动化验收已完成（Java 全量测试、Compose `config` 默认 + 全 profile、差异检查、活动引用扫描）。
+- **尚未完成（主 Agent 后置流程）**：**独立只读复核**（**首次复核返回 1 项 P1 + 2 项 P2，返工中、待复审，尚未通过**）、中文提交、本地合并复验、`git push`（须用户明确确认）。
+- 本设计稿的「待用户审阅批准 / 唯一待办」状态**已结束**：范围已批准、实施已完成；后续为复核与提交流程。
+
+---
+
+## 11. 2026-09-28 实施与复核更正
+
+> 本节为**追加**的 dated 更正记录，不改写上文历史；目标与 Java-only 边界**不变**。
+
+**实施事实**：旧 Python 实现（`mall-shopping-agent/` 74 个 tracked 文件）与 `document/docker/Dockerfile.agent` 已**由用户手动删除**；助手未发出任何删除命令。活动文档（`docker-compose.yml` 注释、`local-startup.md`、`product-shopping-agent.md`、`project-handoff.md`）与两份 `2026-09-23-java-*` 历史附记已同步。工作树内自动化验收已完成。
+
+**首次独立只读复核（`gpt-6-luna`，推理强度 `max`）结论：未通过**，返回 **1 项 P1 + 2 项 P2**：
+
+| 级别 | 发现 | 处置 |
+| --- | --- | --- |
+| P1 | 本设计稿第 6 / 8 / 10 节仍把 **Git 递归删除旧 Python 目录写成已采纳方案**，与 `AGENTS.md` 第 5 节「禁止批量删除文件或目录」冲突；真实操作是**用户手动删除** | 已修正：第 6 / 8 节改为**用户手动删除**；递归删除命令仅在**明确标注“已被取代、不得执行”**的历史说明中提及，**不再出现步骤式递归删除指引**；第 10 节改为「已决事项与当前进度」 |
+| P2 | `docs/context/project-handoff.md` 第 112 行把**已不存在的** `codex/deepseek-base-url`、`codex/java-agent-migration` worktree 列为“待清理候选”；第 121 行把**已不在 `git worktree list`** 的 `agent-live-acceptance` 放进“当前剩余任务” | 已修正：改为事实描述（旧 worktree 不在当前 `git worktree list`，**分支 ref 仍保留、不清理**，非当前 worktree 清理待办）；`agent-live-acceptance` 从「当前剩余任务」移除（详细历史保留在上一节） |
+| P2 | 本设计稿仍写“待用户审阅批准/唯一待办”；实施计划进度与本地报告当时不同步 | 已修正：本稿状态更新为「已批准并已实施，后续复核/提交未完成」；实施计划与本地报告已按实际进度同步 |
+
+**明确边界**：本节**不含**任何可执行的 Git 删除命令；**不得**把递归/批量删除作为建议或步骤。复核返工**尚未复审通过**。
