@@ -711,8 +711,8 @@ Logstash 的 9600 API 默认只在容器内监听，宿主机以 `docker inspect
 运行实现是 **Java 17 的 `mall-master/mall-agent`**：Compose 用 `document/docker/Dockerfile.app`
 以 `MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086` 从仓库根
 构建，运行镜像为 `eclipse-temurin:17-jre`，启动命令是 `java -jar /app/app.jar`。
-`mall-shopping-agent/` 下的 Python 源码、测试与 `document/docker/Dockerfile.agent`
-仅作参考保留，Compose 不再构建它们。
+旧 Python 实现（`mall-shopping-agent/` 目录与其独立镜像定义 `document/docker/Dockerfile.agent`）
+已从仓库退役删除，Compose 只构建上述 Java 实现；本句为历史状态说明，不是构建指引。
 
 ```powershell
 docker compose --profile app build mall-shopping-agent   # 首次需要构建
@@ -925,71 +925,9 @@ docker exec mall-local-redis-1 redis-cli -n 0 del "<key>"
 登录会员使用 `mall:agent:session:member:<memberId>:<sessionId>`，
 持有有效 Token 时游客会话会迁移到会员命名空间并删除游客键。
 
-**回滚到 Python v1 运行时**（仅在 Java 实现验收失败、且用户确认后执行）：
-
-> **先区分两种状态（命令不同）**
->
-> - **当前状态（Java 尚未合并入 `main`）——直接回滚**：Java 迁移改动只存在于工作树
->   `F:\code\mall\.worktrees\java-agent-migration`；主仓库 `F:\code\mall\docker-compose.yml`
->   **仍是原 Python 构建**（`context: ./mall-shopping-agent` +
->   `dockerfile: ../document/docker/Dockerfile.agent`，无 build args），且 `F:\code\mall\.env`、
->   Python 构建上下文与 `document/docker/Dockerfile.agent` 均存在。此时**无需修改任何 Compose 文件**，
->   直接回到主仓库用真实本机 `.env` 重建目标服务即可恢复 Python 运行容器：
->
->   ```powershell
->   Set-Location F:\code\mall
->   docker compose --env-file .env --profile app up -d --no-deps --build mall-shopping-agent
->   ```
->
->   `--no-deps` 只操作 `mall-shopping-agent`，不重建依赖或其他应用；命令只引用 `.env` 路径，
->   **不读取、不输出**其中任何值。**不要**改用本工作树的 Java Compose，也**不要**用
->   `.env.example`（它只含占位值）。
->
-> - **将来状态（Java 已合并入 `main`）**：主仓库 `docker-compose.yml` 会变为 Java 构建，
->   那时才需要先按下面第 1–2 项还原 Python build 段与 Python healthcheck，再执行第 5 项
->   **同一条只重建目标服务**的命令（仍用真实本机 `.env`，不输出其内容）。
-
-**等 Java 合并入 `main` 后**，回滚才需要改文件：把 `docker-compose.yml` 的 `mall-shopping-agent`
-服务块还原为 Python 版本。
-仓库中 `document/docker/Dockerfile.agent`、`mall-shopping-agent/` 源码与
-`mall-shopping-agent/.dockerignore` 均已保留，不需要恢复任何被删除或改动的文件。
-以下第 1–4 项是**将来合并入 main 后**需要还原的 4 类配置，第 5 项是构建与重启命令
-（除这 4 类配置外，其余服务字段新旧一致）：
-
-1. **build 段**：改回 `context: ./mall-shopping-agent` +
-   `dockerfile: ../document/docker/Dockerfile.agent`，并**删除** Java 版新增的 build args
-   （`MODULE=mall-agent`、`JAR_FILE=mall-agent-1.0-SNAPSHOT.jar`、`APP_PORT=8086`，
-   以及运行身份 ARG `APP_RUN_USER=mallapp`、`APP_HOME=/app`）。
-   旧 `Dockerfile.agent` 不声明任何 `ARG`，传入这些参数不会报错但完全被忽略，删除是为了避免误导。
-   `image: ${AGENT_IMAGE:-mall-local/mall-shopping-agent:local}` 新旧一致，不用改。
-2. **healthcheck**：改回镜像内 **Python 标准库**探测（Python 运行镜像**没有 curl**，
-   不能用 curl 探针；`Dockerfile.agent` 里的 `HEALTHCHECK` 会被 Compose 的 healthcheck 覆盖）：
-
-   ```text
-   CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8086/health/live', timeout=5).status == 200 else 1)"
-   ```
-
-   `interval: 15s` / `timeout: 10s` / `retries: 10` / `start_period: 30s` 与旧版一致。
-3. **environment**：两种做法都可以——
-   （a）原样保留 23 个 `MALL_AGENT_*`（Python 端会忽略它不认识的变量，不影响启动）；
-   （b）还原为旧版 13 个 + `TZ`：`MALL_AGENT_HOST`、`MALL_AGENT_PORT`、`MALL_AGENT_LOG_LEVEL`、
-   `MALL_AGENT_MODEL_MODE`、`MALL_AGENT_OPENAI_BASE_URL`、`MALL_AGENT_OPENAI_MODEL`、
-   `MALL_AGENT_OPENAI_API_KEY`、`MALL_AGENT_OPENAI_TIMEOUT_SECONDS`、
-   `MALL_AGENT_REQUEST_TIMEOUT_SECONDS`、`MALL_AGENT_MAX_TOOL_ROUNDS`、
-   `MALL_AGENT_SESSION_TTL_SECONDS`、`MALL_AGENT_PORTAL_BASE_URL`、`MALL_AGENT_REDIS_URL`。
-   注意 `MALL_AGENT_REQUEST_TIMEOUT_SECONDS` 在旧版同样是固定 `"35"`，不要放宽。
-4. **其它字段**：`profiles: ["app"]`、`ports`（`127.0.0.1:${AGENT_PORT:-8086}:8086`）、
-   `depends_on`（`redis` 与 `mall-portal` 均 `service_healthy`）、`restart` 新旧一致，不用改。
-   **注意 `networks` 与 `user` 已与 Python 版不同**：Java 版把 Agent 移出 `mall-net`，改为只接入
-   `agent-proxy-net`（静态地址 `172.21.240.3`）与 `agent-backend-net`，并新增 `user: "10001:10001"`。
-   回滚为 Python 版时应把该服务的 `networks` 还原为 `- mall-net` 并**删除** `user` 字段；
-   顶层 `agent-proxy-net` / `agent-backend-net` 在不被其它服务引用时可一并删除。
-5. 改完后在 `F:\code\mall` 执行
-   `docker compose --env-file .env --profile app up -d --no-deps --build mall-shopping-agent`
-   重建并重启该 service（只用真实本机 `.env`，**不输出其内容**；`--no-deps` 不重建依赖或其他应用）。
-
-执行前先只读确认现有容器状态与将被替换的容器，
-不要在验收失败时盲目重建共享服务或清理 volume。
+**回滚说明（Git 层）**：旧 Python 运行时已从仓库删除，**不再提供任何本地 Python 回滚路径**。
+如需回滚，对已合并到 `main` 的退役提交执行 `git revert <退役提交>`，随后重新按本章验收。
+此处不再保留 Python 构建上下文或旧命令示例。
 
 ---
 

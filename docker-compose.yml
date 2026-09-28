@@ -412,7 +412,7 @@ services:
   # app profile：商品导购智能体（Java 17 / mall-agent，只读）
   # ---------------------------------------------------------------------------
   # 运行实现是 mall-master/mall-agent（Spring Boot，Java 17），由 Dockerfile.app 构建；
-  # mall-shopping-agent/ 下的 Python 源码与历史测试仅作参考，Compose 不再构建它。
+  # 旧 Python 实现（mall-shopping-agent/ 目录与其独立 Dockerfile.agent）已退役删除，Compose 不再构建它。
   # 只通过 HTTP 调用 mall-portal 的五个只读接口，不直连 MySQL / MongoDB /
   # RabbitMQ / Elasticsearch，也不执行任何 SQL；会话与限流状态放在 Redis。
   # 安全约定：
@@ -437,8 +437,8 @@ services:
     user: "10001:10001"
     build:
       # 使用仓库根作为构建上下文，复用 Java 多阶段构建模板编译 mall-agent 模块。
-      # 需要回到 Python 旧实现时，按计划回滚为
-      # context: ./mall-shopping-agent + dockerfile: ../document/docker/Dockerfile.agent。
+      # 旧 Python 独立构建路径（./mall-shopping-agent + Dockerfile.agent）已退役删除；
+      # 如需回滚，走 Git 层：对已合并 main 的退役提交执行 git revert，不在此恢复 Python 构建上下文。
       context: .
       dockerfile: document/docker/Dockerfile.app
       args:
